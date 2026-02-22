@@ -1144,9 +1144,12 @@ const builtins: Record<string, BuiltinFunction> = {
     return arrayToConsList(keyStrings);
   }),
   get: new BuiltinFunction((args, env) => {
-    if (args.length !== 2) throw new SSpecError("get requires 2 arguments");
+    if (args.length < 2 || args.length > 3) {
+      throw new SSpecError("get requires 2 or 3 arguments");
+    }
     const obj = args[0];
     const key = args[1];
+    const defaultValue = args.length === 3 ? args[2] : null;
 
     if (!isPlainObject(obj)) {
       throw new SSpecError("get requires an object as first argument");
@@ -1163,7 +1166,8 @@ const builtins: Record<string, BuiltinFunction> = {
 
     // Type guard ensures obj is ObjectValue here
     const objValue: ObjectValue = obj;
-    return objValue[keyStr] ?? null;
+    const result = objValue[keyStr];
+    return result !== undefined ? result : defaultValue;
   }),
   // Regex operations (i-regexp - RFC 9485 portable regex subset)
   re: new BuiltinFunction((args, env) => {
@@ -1618,12 +1622,66 @@ function evalCallExpr(expr: CallNode, env: Environment): Value {
       // Macro - expand and evaluate
       const expanded = op.expand(expr.args, env);
       return evalExpr(macroExpand(expanded, env), env);
+    } else if (isKeyword(op)) {
+      // Keyword-as-function: (k map) where k is bound to a keyword
+      if (expr.args.length < 1 || expr.args.length > 2) {
+        throw new SSpecError(
+          "Keyword as function requires 1 or 2 arguments",
+          pos
+        );
+      }
+      const evaluatedArgs = expr.args.map((arg) => evalExpr(arg, env));
+      const obj = evaluatedArgs[0];
+
+      if (!isPlainObject(obj)) {
+        throw new SSpecError(
+          "Keyword lookup requires an object as first argument",
+          pos
+        );
+      }
+
+      const keyStr = op.kw;
+      const result = (obj as any)[keyStr];
+
+      if (result === undefined) {
+        return expr.args.length === 2 ? evaluatedArgs[1] : null;
+      }
+
+      return result;
     } else {
       throw new SSpecError("Operator must be a function", pos);
     }
   }
 
   const op = evalExpr(opExpr, env);
+
+  // Handle keyword-as-function: (:key map) or (:key map default)
+  if (isKeyword(op)) {
+    if (expr.args.length < 1 || expr.args.length > 2) {
+      throw new SSpecError(
+        "Keyword as function requires 1 or 2 arguments",
+        pos
+      );
+    }
+    const evaluatedArgs = expr.args.map((arg) => evalExpr(arg, env));
+    const obj = evaluatedArgs[0];
+
+    if (!isPlainObject(obj)) {
+      throw new SSpecError(
+        "Keyword lookup requires an object as first argument",
+        pos
+      );
+    }
+
+    const keyStr = op.kw;
+    const result = (obj as any)[keyStr];
+
+    if (result === undefined) {
+      return expr.args.length === 2 ? evaluatedArgs[1] : null;
+    }
+
+    return result;
+  }
 
   if (isCallable(op)) {
     const args = expr.args.map((arg) => evalExpr(arg, env));

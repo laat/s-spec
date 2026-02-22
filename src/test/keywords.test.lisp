@@ -50,3 +50,55 @@
 (test "keyword not equal to string"
   (assert/equal (= :foo "foo") false)
   (assert/equal (= :"my key" "my key") false))
+
+; Keyword-as-function tests (Clojure-style)
+
+(test "keyword-as-function - basic lookup"
+  (assert/equal (:nisse {:nisse "far"}) "far")
+  (assert/equal (:name {:name "John"}) "John")
+  (assert/equal (:age {:age 30}) 30))
+
+(test "keyword-as-function - missing key returns nil"
+  (assert/equal (:missing {:nisse "far"}) nil)
+  (assert/equal (:foo {}) nil))
+
+(test "keyword-as-function - with default value"
+  (assert/equal (:missing {:nisse "far"} "default") "default")
+  (assert/equal (:foo {} "not-found") "not-found")
+  (assert/equal (:bar {:baz 1} 99) 99))
+
+(test "keyword-as-function - default not used when key exists"
+  (assert/equal (:nisse {:nisse "far"} "default") "far")
+  (assert/equal (:age {:age 0} 99) 0))
+
+
+(test "keyword-as-function - nested maps"
+  (def data {:user {:name "John" :age 30}})
+  (assert/equal (:name (:user data)) "John")
+  (assert/equal (:age (:user data)) 30))
+
+(test "keyword-as-function - with variables"
+  (def k :age)
+  (def m {:age 25})
+  (assert/equal (k m) 25))
+
+(test "keyword-as-function - error on non-object"
+  (assert/throws (fn [] (:key "not-an-object")) "requires an object")
+  (assert/throws (fn [] (:key 123)) "requires an object")
+  (assert/throws (fn [] (:key nil)) "requires an object"))
+
+(test "keyword-as-function - error on wrong arity"
+  (assert/throws (fn [] (:key)) "requires 1 or 2 arguments")
+  (assert/throws (fn [] (:key {} {} {})) "requires 1 or 2 arguments"))
+
+(test "keyword-as-function - quoted keywords"
+  (assert/equal (:"my key" {:"my key" "value"}) "value")
+  (assert/equal (:"" {:"" "empty-key"}) "empty-key"))
+
+; get builtin with default parameter
+
+(test "get with default parameter"
+  (assert/equal (get {:foo "bar"} :foo "default") "bar")
+  (assert/equal (get {} :missing "default") "default")
+  (assert/equal (get {:x nil} :x "default") nil)
+  (assert/equal (get {:y 0} :y "default") 0))

@@ -10,7 +10,7 @@ import {
   Environment,
   SSpecError,
   isCallable,
-} from "./index.ts";
+} from "./index.js";
 
 const VERSION = "0.0.1";
 
