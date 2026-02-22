@@ -1,0 +1,25 @@
+{
+  "name": "s-spec",
+  "version": "0.0.1",
+  "description": "A minimal, embeddable Lisp DSL for validating and conforming JSON values",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/stdlib.lisp dist/stdlib.lisp && cp src/stdlib-test.lisp dist/stdlib-test.lisp",
+    "test": "tsc && node --experimental-strip-types --test src/**/*.test.ts",
+    "dev": "tsc --watch -p tsconfig.build.json"
+  },
+  "keywords": [
+    "validation",
+    "schema",
+    "json",
+    "lisp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
