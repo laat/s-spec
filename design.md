@@ -42,8 +42,13 @@ The core insight borrowed from Clojure Spec is: **validation and parsing are the
 - Generating host-language types from specs.
 - Generating JSON from specs (the reverse direction).
 - A general-purpose Lisp runtime.
-- Macro systems, namespaces, or module systems.
+- Complex module systems with dependency management, versioning, or package registries.
+- Namespaces as a first-class language feature — code organization should use naming conventions (e.g., `email/validator` symbols).
 - JSONPath support in `ConformedNode.get()` — single-key access only for now. Path traversal would propagate null through optional absences and throw `AccessError` on required absences, jq-style.
+
+**Basic file loading is in scope:**
+
+A simple `load` function allows splitting large specs across multiple files. Files are loaded relative to the loading file and evaluated once per session (idempotent). All definitions from loaded files share the global environment. For code organization, use naming conventions in symbol names (e.g., `user/email-validator`, `common/string-checks`) rather than true namespaces.
 
 ---
 
