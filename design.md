@@ -305,6 +305,22 @@ s-spec uses [I-regexp](https://www.rfc-editor.org/rfc/rfc9485) — the Interoper
 | `(max-len n)`  | string, array | Length ≤ n               |
 | `(re pattern)` | string        | Matches I-regexp pattern |
 
+### 4.11 Naming Conventions
+
+**Private/internal definitions:**
+
+Functions and macros prefixed with `__` (double underscore) are internal implementation details and should not be used directly:
+
+- `__cond-helper` — internal helper for the `cond` macro
+- `__array-eq`, `__array-eq-iter` — internal helpers for array equality
+- `__object-eq`, `__object-eq-iter` — internal helpers for object equality
+
+These are exported in the global namespace for implementation reasons but are not part of the public API and may change without notice.
+
+**Why not true privacy?**
+
+s-spec deliberately avoids complex module systems or namespaces. The `__` prefix is a lightweight convention that signals intent without requiring language-level privacy enforcement. This keeps the implementation simple while maintaining clear boundaries between public API and internal helpers.
+
 ---
 
 ## 5. Error Model

@@ -6,8 +6,82 @@
 (defmacro defn [name params &rest body]
   (quasiquote (def (unquote name) (fn (unquote params) (unquote (car body))))))
 
+; cond - Multi-branch conditional
+; Expands (cond test1 result1 test2 result2 :else default) to nested if statements
+(defmacro cond [&rest clauses]
+  (__cond-helper clauses))
+
+(defn __cond-helper [clauses]
+  (if (nil? clauses)
+    nil
+    (let [test (car clauses)
+          rest (cdr clauses)]
+      (if (nil? rest)
+        nil
+        (let [result (car rest)
+              remaining (cdr rest)]
+          (if (and (keyword? test) (primitive-eq test :else))
+            result
+            (if (nil? remaining)
+              (quasiquote (if (unquote test) (unquote result) nil))
+              (quasiquote
+                (if (unquote test)
+                  (unquote result)
+                  (unquote (__cond-helper remaining)))))))))))
+
 ; Helper functions
 (defn not [x] (if x false true))
+
+; Core equality - portable implementation using primitive builtins
+; Deep/structural equality for all types
+(defn eq [a b]
+  (cond
+    (and (nil? a) (nil? b))
+      true
+    (or (nil? a) (nil? b))
+      false
+    (or (number? a) (string? a) (boolean? a) (keyword? a) (symbol? a))
+      (primitive-eq a b)
+    (and (array? a) (array? b))
+      (__array-eq a b)
+    (array? a)
+      false
+    (and (object? a) (object? b))
+      (__object-eq a b)
+    (object? a)
+      false
+    :else
+      (primitive-eq a b)))
+
+; Helper: Deep equality for arrays
+(defn __array-eq [a b]
+  (if (not (primitive-eq (length a) (length b)))
+    false
+    (__array-eq-iter a b 0)))
+
+(defn __array-eq-iter [a b i]
+  (if (>= i (length a))
+    true
+    (if (eq (nth a i) (nth b i))
+      (__array-eq-iter a b (+ i 1))
+      false)))
+
+; Helper: Deep equality for objects
+(defn __object-eq [a b]
+  (let [keys-a (keys a)
+        keys-b (keys b)]
+    (if (not (primitive-eq (length keys-a) (length keys-b)))
+      false
+      (__object-eq-iter a b keys-a))))
+
+(defn __object-eq-iter [obj-a obj-b key-list]
+  (if (nil? key-list)
+    true
+    (let [k (car key-list)]
+      (if (eq (get obj-a k) (get obj-b k))
+        (__object-eq-iter obj-a obj-b (cdr key-list))
+        false))))
+
 (defn empty? [x] (eq x nil))
 
 ; Arithmetic macros - provide familiar multi-arity syntax while keeping host impl simple

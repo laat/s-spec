@@ -80,8 +80,12 @@ function createTestEnvironment(): Environment {
     const expected = args[1];
     const message = args[2] || "";
 
-    // Use eq builtin for deep equality check (pass testEnv for consistency)
-    const equal = builtins.eq.call([actual, expected], testEnv);
+    // Use eq function from environment (now defined in stdlib.lisp)
+    const eqFn = testEnv.get("eq");
+    if (!isCallable(eqFn)) {
+      throw new SSpecError("eq function not found in environment");
+    }
+    const equal = eqFn.call([actual, expected], testEnv);
 
     if (!equal) {
       const msg = message ? `${message}: ` : "";
@@ -165,6 +169,7 @@ runLispTestFile(join(__dirname, "test/keywords.test.lisp"));
 runLispTestFile(join(__dirname, "test/maps.test.lisp"));
 runLispTestFile(join(__dirname, "test/vectors.test.lisp"));
 runLispTestFile(join(__dirname, "test/control-flow.test.lisp"));
+runLispTestFile(join(__dirname, "test/cond.test.lisp"));
 runLispTestFile(join(__dirname, "test/let.test.lisp"));
 runLispTestFile(join(__dirname, "test/functions.test.lisp"));
 runLispTestFile(join(__dirname, "test/variadic.test.lisp"));

@@ -986,54 +986,6 @@ const builtins: Record<string, BuiltinFunction> = {
     }
     return args[args.length - 1] ?? null;
   }),
-  eq: new BuiltinFunction((args, env) => {
-    if (args.length !== 2)
-      throw new SSpecError("eq requires exactly 2 arguments");
-
-    const deepEqual = (a: Value, b: Value): boolean => {
-      // nil (null/undefined) values are equal to each other
-      if (isNil(a) && isNil(b)) return true;
-
-      // Primitive AST nodes - compare by value
-      if (isNumberNode(a) && isNumberNode(b)) return a.value === b.value;
-      if (isStringNode(a) && isStringNode(b)) return a.value === b.value;
-      if (isBooleanNode(a) && isBooleanNode(b)) return a.value === b.value;
-      if (isNullNode(a) && isNullNode(b)) return true;
-
-      // Symbols are equal if their sym values match
-      if (isSymbol(a) && isSymbol(b)) {
-        return a.sym === b.sym;
-      }
-      // Keywords are equal if their kw values match
-      if (isKeyword(a) && isKeyword(b)) {
-        return a.kw === b.kw;
-      }
-      // Arrays - deep equality
-      if (isArray(a) && isArray(b)) {
-        if (a.arr.length !== b.arr.length) return false;
-        for (let i = 0; i < a.arr.length; i++) {
-          if (!deepEqual(a.arr[i], b.arr[i])) return false;
-        }
-        return true;
-      }
-      // Plain objects - deep equality
-      if (isPlainObject(a) && isPlainObject(b)) {
-        const objA: ObjectValue = a;
-        const objB: ObjectValue = b;
-        const keysA = Object.keys(objA);
-        const keysB = Object.keys(objB);
-        if (keysA.length !== keysB.length) return false;
-        for (const key of keysA) {
-          if (!(key in objB)) return false;
-          if (!deepEqual(objA[key], objB[key])) return false;
-        }
-        return true;
-      }
-      return a === b;
-    };
-
-    return deepEqual(args[0], args[1]);
-  }),
   gt: new BuiltinFunction((args, env) =>
     binaryNumericOp("gt", args, (a, b) => a > b)
   ),
@@ -1104,6 +1056,30 @@ const builtins: Record<string, BuiltinFunction> = {
     const val = args[0];
     return isSymbol(val);
   }),
+  "nil?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("nil? requires 1 argument");
+    return isNil(args[0]);
+  }),
+  "number?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("number? requires 1 argument");
+    return isNumber(args[0]);
+  }),
+  "string?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("string? requires 1 argument");
+    return isString(args[0]);
+  }),
+  "boolean?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("boolean? requires 1 argument");
+    return isBoolean(args[0]);
+  }),
+  "keyword?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("keyword? requires 1 argument");
+    return isKeyword(args[0]);
+  }),
+  "object?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("object? requires 1 argument");
+    return isPlainObject(args[0]);
+  }),
   nth: new BuiltinFunction((args, env) => {
     if (args.length !== 2) throw new SSpecError("nth requires 2 arguments");
     const arr = args[0];
@@ -1157,6 +1133,38 @@ const builtins: Record<string, BuiltinFunction> = {
     const itemExpr = valueToExpr(item);
     return ast.array([...arr.arr, itemExpr], SYNTHETIC_POS);
   }),
+  // Object operations
+  keys: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("keys requires 1 argument");
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("keys requires an object");
+    }
+    const keyStrings = Object.keys(obj);
+    return arrayToConsList(keyStrings);
+  }),
+  get: new BuiltinFunction((args, env) => {
+    if (args.length !== 2) throw new SSpecError("get requires 2 arguments");
+    const obj = args[0];
+    const key = args[1];
+
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("get requires an object as first argument");
+    }
+
+    let keyStr: string;
+    if (isString(key)) {
+      keyStr = key;
+    } else if (isKeyword(key)) {
+      keyStr = key.kw;
+    } else {
+      throw new SSpecError("get key must be a string or keyword");
+    }
+
+    // Type guard ensures obj is ObjectValue here
+    const objValue: ObjectValue = obj;
+    return objValue[keyStr] ?? null;
+  }),
   // Regex operations (i-regexp - RFC 9485 portable regex subset)
   re: new BuiltinFunction((args, env) => {
     if (args.length !== 1) throw new SSpecError("re requires 1 argument");
@@ -1183,6 +1191,26 @@ const builtins: Record<string, BuiltinFunction> = {
     } catch (e) {
       throw new SSpecError(`Invalid regex pattern: ${pattern}`);
     }
+  }),
+  // Primitive equality - compares primitives using host language ===
+  "primitive-eq": new BuiltinFunction((args, env) => {
+    if (args.length !== 2) throw new SSpecError("primitive-eq requires 2 arguments");
+    const a = args[0];
+    const b = args[1];
+
+    // Numbers, strings, booleans - direct comparison
+    if (isNumber(a) && isNumber(b)) return a === b;
+    if (isString(a) && isString(b)) return a === b;
+    if (isBoolean(a) && isBoolean(b)) return a === b;
+
+    // Keywords - compare wrapped values
+    if (isKeyword(a) && isKeyword(b)) return a.kw === b.kw;
+
+    // Symbols - compare wrapped values
+    if (isSymbol(a) && isSymbol(b)) return a.sym === b.sym;
+
+    // Different types or non-primitives
+    return false;
   }),
   gensym: new BuiltinFunction((args, env) => {
     if (args.length > 1) {
