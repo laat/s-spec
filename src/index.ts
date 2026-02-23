@@ -204,9 +204,8 @@ class Environment {
   enterRecursion(pos?: Position): void {
     this.recursionTracker.depth++;
     if (this.recursionTracker.depth > this.recursionTracker.maxDepth) {
-      const posStr = pos ? ` at ${pos.line}:${pos.col}` : "";
       throw new SSpecError(
-        `Maximum recursion depth (${this.recursionTracker.maxDepth}) exceeded${posStr}. ` +
+        `Maximum recursion depth (${this.recursionTracker.maxDepth}) exceeded. ` +
           `This may indicate infinite recursion or very deep nesting.`,
         pos
       );
@@ -224,8 +223,7 @@ class Environment {
     if (this.parent) {
       return this.parent.get(name, pos);
     }
-    const posStr = pos ? ` at ${pos.line}:${pos.col}` : "";
-    throw new SSpecError(`Undefined variable: ${name}${posStr}`, pos);
+    throw new SSpecError(`Undefined variable: ${name}`, pos);
   }
 
   has(name: string): boolean {

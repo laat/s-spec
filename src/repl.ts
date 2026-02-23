@@ -10,7 +10,7 @@ import {
   Environment,
   SSpecError,
   isCallable,
-} from "./index.js";
+} from "./index.ts";
 
 const VERSION = "0.0.1";
 
@@ -92,7 +92,7 @@ function formatValue(value: any): string {
  */
 function handleCommand(
   command: string,
-  env: Environment
+  env: Environment,
 ): { newEnv?: Environment; exit?: boolean } {
   const trimmed = command.trim();
 
@@ -137,7 +137,7 @@ Multi-line expressions are supported - the REPL will wait for balanced parenthes
   }
 
   console.error(`Unknown command: ${trimmed}`);
-  console.error('Type .help for available commands');
+  console.error("Type .help for available commands");
   return {};
 }
 
@@ -160,9 +160,6 @@ function evalAndPrint(input: string, env: Environment): void {
   } catch (e) {
     if (e instanceof SSpecError) {
       console.error(`Error: ${e.message}`);
-      if (e.line !== undefined && e.col !== undefined) {
-        console.error(`  at line ${e.line}, column ${e.col}`);
-      }
     } else {
       console.error(`Error: ${(e as Error).message}`);
     }
@@ -174,7 +171,7 @@ function evalAndPrint(input: string, env: Environment): void {
  */
 async function startRepl(): Promise<void> {
   console.log(`s-spec REPL v${VERSION}`);
-  console.log('Type .help for available commands, .exit to quit\n');
+  console.log("Type .help for available commands, .exit to quit\n");
 
   const rl = readline.createInterface({ input, output });
   let env = createEnv();
