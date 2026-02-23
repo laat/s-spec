@@ -121,6 +121,75 @@ class BuiltinFunction implements Callable {
   }
 }
 
+class SeqView {
+  private source: ArrayNode;
+  private index: number;
+
+  constructor(source: ArrayNode, index = 0) {
+    this.source = source;
+    this.index = index;
+  }
+
+  first(): Value {
+    return arrayElementToValue(this.source.arr[this.index]);
+  }
+
+  rest(): SeqView | null {
+    const nextIndex = this.index + 1;
+    if (nextIndex >= this.source.arr.length) {
+      return null;
+    }
+    return new SeqView(this.source, nextIndex);
+  }
+
+  length(): number {
+    return this.source.arr.length - this.index;
+  }
+}
+
+type ObjectSeqMode = "keys" | "vals" | "entries";
+
+class ObjectSeqView {
+  private source: ObjectValue;
+  private keys: string[];
+  private index: number;
+  private mode: ObjectSeqMode;
+
+  constructor(source: ObjectValue, keys: string[], mode: ObjectSeqMode, index = 0) {
+    this.source = source;
+    this.keys = keys;
+    this.mode = mode;
+    this.index = index;
+  }
+
+  first(): Value {
+    const key = this.keys[this.index];
+    const value = this.source[key] === undefined ? null : this.source[key];
+
+    if (this.mode === "keys") {
+      return ast.keyword(key, SYNTHETIC_POS);
+    }
+
+    if (this.mode === "vals") {
+      return value;
+    }
+
+    return arrayToConsList([ast.keyword(key, SYNTHETIC_POS), value]);
+  }
+
+  rest(): ObjectSeqView | null {
+    const nextIndex = this.index + 1;
+    if (nextIndex >= this.keys.length) {
+      return null;
+    }
+    return new ObjectSeqView(this.source, this.keys, this.mode, nextIndex);
+  }
+
+  length(): number {
+    return this.keys.length - this.index;
+  }
+}
+
 type Params = {
   required: string[];
   rest: string | null;
@@ -141,6 +210,8 @@ type Value =
   | BuiltinFunction
   | UserFunction
   | Macro
+  | SeqView
+  | ObjectSeqView
   | Expr // Includes all AST nodes for macro expansion
   | ObjectValue;
 
@@ -634,6 +705,11 @@ const isBuiltinFunction = (v: Value): v is BuiltinFunction =>
 const isUserFunction = (v: Value): v is UserFunction =>
   v instanceof UserFunction;
 const isMacro = (v: Value): v is Macro => v instanceof Macro;
+const isSeqView = (v: Value): v is SeqView => v instanceof SeqView;
+const isObjectSeqView = (v: Value): v is ObjectSeqView =>
+  v instanceof ObjectSeqView;
+const isSequenceView = (v: Value): v is SeqView | ObjectSeqView =>
+  isSeqView(v) || isObjectSeqView(v);
 const isCallable = (v: Value): v is BuiltinFunction | UserFunction =>
   isBuiltinFunction(v) || isUserFunction(v);
 const isFunction = (v: Value): v is BuiltinFunction | UserFunction =>
@@ -669,7 +745,9 @@ const isPlainObject = (v: Value): v is ObjectValue => {
   if (
     v instanceof BuiltinFunction ||
     v instanceof UserFunction ||
-    v instanceof Macro
+    v instanceof Macro ||
+    v instanceof SeqView ||
+    v instanceof ObjectSeqView
   )
     return false;
   // Exclude AST nodes - they are tagged with the AST_NODE Symbol
@@ -702,6 +780,7 @@ function getValueTypeName(v: Value): string {
   if (isCallNode(v)) return "call-node";
   if (isUserFunction(v)) return "user-function";
   if (isMacro(v)) return "macro";
+  if (isSequenceView(v)) return "seq";
   if (isBuiltinFunction(v)) return "builtin-function";
   if (isPlainObject(v)) return "object";
   return typeof v;
@@ -798,6 +877,14 @@ const consListToArray = (list: Value): Value[] => {
   return result;
 };
 
+function arrayElementToValue(element: Expr): Value {
+  if (isNumberNode(element)) return element.value;
+  if (isStringNode(element)) return element.value;
+  if (isBooleanNode(element)) return element.value;
+  if (isNullNode(element)) return null;
+  return element;
+}
+
 function toSExpr(expr: Expr | Value): string {
   if (expr == null) {
     return "null";
@@ -863,6 +950,16 @@ function toSExpr(expr: Expr | Value): string {
         const args = expr.args.map((a) => toSExpr(a));
         return `(${op}${args.length > 0 ? " " + args.join(" ") : ""})`;
     }
+  }
+
+  if (isSequenceView(expr)) {
+    const elements: string[] = [];
+    let current: SeqView | ObjectSeqView | null = expr;
+    while (current !== null) {
+      elements.push(toSExpr(current.first()));
+      current = current.rest();
+    }
+    return `(${elements.join(" ")})`;
   }
 
   // Handle plain objects (evaluated ObjectValue) - runtime values
@@ -1015,27 +1112,48 @@ const builtins: Record<string, BuiltinFunction> = {
       .join("");
   }),
   list: new BuiltinFunction((args, env) => arrayToConsList(args)),
+  seq: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) {
+      throw new SSpecError("seq requires 1 argument");
+    }
+
+    const value = args[0];
+    if (isNil(value)) return null;
+    if (isCons(value)) return value;
+    if (isSequenceView(value)) return value;
+    if (isArray(value)) {
+      return value.arr.length === 0 ? null : new SeqView(value);
+    }
+
+    throw new SSpecError("seq requires a list, array, or null");
+  }),
   cons: new BuiltinFunction((args, env) => {
     if (args.length !== 2) throw new SSpecError("cons requires 2 arguments");
     return ast.cons(args[0], args[1], SYNTHETIC_POS);
   }),
-  car: new BuiltinFunction((args, env) => {
-    if (args.length !== 1) throw new SSpecError("car requires 1 argument");
+  first: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("first requires 1 argument");
     const cell = args[0];
     if (cell === null || cell === undefined) return null;
     if (isCons(cell)) {
       return cell.car;
     }
-    throw new SSpecError("car requires a cons cell");
+    if (isSequenceView(cell)) {
+      return cell.first();
+    }
+    throw new SSpecError("first requires a list or sequence");
   }),
-  cdr: new BuiltinFunction((args, env) => {
-    if (args.length !== 1) throw new SSpecError("cdr requires 1 argument");
+  rest: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("rest requires 1 argument");
     const cell = args[0];
     if (cell === null || cell === undefined) return null;
     if (isCons(cell)) {
       return cell.cdr;
     }
-    throw new SSpecError("cdr requires a cons cell");
+    if (isSequenceView(cell)) {
+      return cell.rest();
+    }
+    throw new SSpecError("rest requires a list or sequence");
   }),
   // Array operations
   array: new BuiltinFunction((args, env) => {
@@ -1093,20 +1211,17 @@ const builtins: Record<string, BuiltinFunction> = {
     if (index < 0 || index >= arr.arr.length) {
       return null; // Return null for out of bounds (like Clojure)
     }
-    const element = arr.arr[index];
-    // If element is a literal Expr node, extract its value
-    if (isNumberNode(element)) return element.value;
-    if (isStringNode(element)) return element.value;
-    if (isBooleanNode(element)) return element.value;
-    if (isNullNode(element)) return null;
-    return element;
+    return arrayElementToValue(arr.arr[index]);
   }),
-  length: new BuiltinFunction((args, env) => {
-    if (args.length !== 1) throw new SSpecError("length requires 1 argument");
+  count: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("count requires 1 argument");
     const val = args[0];
     if (val === null || val === undefined) return 0;
     if (isArray(val)) {
       return val.arr.length;
+    }
+    if (isSequenceView(val)) {
+      return val.length();
     }
     // Length works on cons cell lists too
     if (isCons(val)) {
@@ -1118,7 +1233,7 @@ const builtins: Record<string, BuiltinFunction> = {
       }
       return count;
     }
-    throw new SSpecError("length requires an array or list");
+    throw new SSpecError("count requires an array, list, or sequence");
   }),
   push: new BuiltinFunction((args, env) => {
     if (args.length !== 2) throw new SSpecError("push requires 2 arguments");
@@ -1139,7 +1254,31 @@ const builtins: Record<string, BuiltinFunction> = {
       throw new SSpecError("keys requires an object");
     }
     const keyStrings = Object.keys(obj);
-    return arrayToConsList(keyStrings);
+    return keyStrings.length === 0
+      ? null
+      : new ObjectSeqView(obj, keyStrings, "keys");
+  }),
+  vals: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("vals requires 1 argument");
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("vals requires an object");
+    }
+    const keyStrings = Object.keys(obj);
+    return keyStrings.length === 0
+      ? null
+      : new ObjectSeqView(obj, keyStrings, "vals");
+  }),
+  entries: new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("entries requires 1 argument");
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("entries requires an object");
+    }
+    const keyStrings = Object.keys(obj);
+    return keyStrings.length === 0
+      ? null
+      : new ObjectSeqView(obj, keyStrings, "entries");
   }),
   get: new BuiltinFunction((args, env) => {
     if (args.length < 2 || args.length > 3) {

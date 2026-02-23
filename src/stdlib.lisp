@@ -4,7 +4,7 @@
 ; defn - Define a named function
 ; Expands (defn name [params] body) to (def name (fn [params] body))
 (defmacro defn [name params &rest body]
-  (quasiquote (def (unquote name) (fn (unquote params) (unquote (car body))))))
+  (quasiquote (def (unquote name) (fn (unquote params) (unquote (first body))))))
 
 ; cond - Multi-branch conditional
 ; Expands (cond test1 result1 test2 result2 :else default) to nested if statements
@@ -14,12 +14,12 @@
 (defn __cond-helper [clauses]
   (if (null? clauses)
     null
-    (let [test (car clauses)
-          rest (cdr clauses)]
+    (let [test (first clauses)
+          rest (rest clauses)]
       (if (null? rest)
         null
-        (let [result (car rest)
-              remaining (cdr rest)]
+        (let [result (first rest)
+              remaining (rest rest)]
           (if (and (keyword? test) (primitive-eq test :else))
             result
             (if (null? remaining)
@@ -55,31 +55,31 @@
 
 ; Helper: Deep equality for arrays
 (defn __array-eq [a b]
-  (if (not (primitive-eq (length a) (length b)))
+  (if (not (primitive-eq (count a) (count b)))
     false
-    (__array-eq-iter a b 0)))
+    (__array-eq-iter (seq a) (seq b))))
 
-(defn __array-eq-iter [a b i]
-  (if (>= i (length a))
+(defn __array-eq-iter [seq-a seq-b]
+  (if (null? seq-a)
     true
-    (if (eq (nth a i) (nth b i))
-      (__array-eq-iter a b (+ i 1))
+    (if (eq (first seq-a) (first seq-b))
+      (__array-eq-iter (rest seq-a) (rest seq-b))
       false)))
 
 ; Helper: Deep equality for objects
 (defn __object-eq [a b]
-  (let [keys-a (keys a)
-        keys-b (keys b)]
-    (if (not (primitive-eq (length keys-a) (length keys-b)))
+  (let [keys-a (seq (keys a))
+        keys-b (seq (keys b))]
+    (if (not (primitive-eq (count keys-a) (count keys-b)))
       false
       (__object-eq-iter a b keys-a))))
 
 (defn __object-eq-iter [obj-a obj-b key-list]
   (if (null? key-list)
     true
-    (let [k (car key-list)]
+    (let [k (first key-list)]
       (if (eq (get obj-a k) (get obj-b k))
-        (__object-eq-iter obj-a obj-b (cdr key-list))
+        (__object-eq-iter obj-a obj-b (rest key-list))
         false))))
 
 (defn empty? [x] (eq x null))
@@ -91,41 +91,41 @@
 (defmacro + [&rest args]
   (if (eq args null)
     (quote 0)
-    (if (eq (cdr args) null)
-      (car args)
-      (if (eq (cdr (cdr args)) null)
-        (quasiquote (add (unquote (car args)) (unquote (car (cdr args)))))
-        (quasiquote (add (unquote (car args)) (+ (unquote-splicing (cdr args)))))))))
+    (if (eq (rest args) null)
+      (first args)
+      (if (eq (rest (rest args)) null)
+        (quasiquote (add (unquote (first args)) (unquote (first (rest args)))))
+        (quasiquote (add (unquote (first args)) (+ (unquote-splicing (rest args)))))))))
 
 ; - macro - variadic subtraction (left-to-right)
 (defmacro - [&rest args]
   (if (eq args null)
     (quote 0)
-    (if (eq (cdr args) null)
-      (quasiquote (sub 0 (unquote (car args))))
-      (if (eq (cdr (cdr args)) null)
-        (quasiquote (sub (unquote (car args)) (unquote (car (cdr args)))))
-        (quasiquote (- (sub (unquote (car args)) (unquote (car (cdr args)))) (unquote-splicing (cdr (cdr args)))))))))
+    (if (eq (rest args) null)
+      (quasiquote (sub 0 (unquote (first args))))
+      (if (eq (rest (rest args)) null)
+        (quasiquote (sub (unquote (first args)) (unquote (first (rest args)))))
+        (quasiquote (- (sub (unquote (first args)) (unquote (first (rest args)))) (unquote-splicing (rest (rest args)))))))))
 
 ; * macro - variadic multiplication
 (defmacro * [&rest args]
   (if (eq args null)
     (quote 1)
-    (if (eq (cdr args) null)
-      (car args)
-      (if (eq (cdr (cdr args)) null)
-        (quasiquote (mul (unquote (car args)) (unquote (car (cdr args)))))
-        (quasiquote (mul (unquote (car args)) (* (unquote-splicing (cdr args)))))))))
+    (if (eq (rest args) null)
+      (first args)
+      (if (eq (rest (rest args)) null)
+        (quasiquote (mul (unquote (first args)) (unquote (first (rest args)))))
+        (quasiquote (mul (unquote (first args)) (* (unquote-splicing (rest args)))))))))
 
 ; / macro - variadic division (left-to-right)
 (defmacro / [&rest args]
   (if (eq args null)
     (quote 1)
-    (if (eq (cdr args) null)
-      (quasiquote (div 1 (unquote (car args))))
-      (if (eq (cdr (cdr args)) null)
-        (quasiquote (div (unquote (car args)) (unquote (car (cdr args)))))
-        (quasiquote (/ (div (unquote (car args)) (unquote (car (cdr args)))) (unquote-splicing (cdr (cdr args)))))))))
+    (if (eq (rest args) null)
+      (quasiquote (div 1 (unquote (first args))))
+      (if (eq (rest (rest args)) null)
+        (quasiquote (div (unquote (first args)) (unquote (first (rest args)))))
+        (quasiquote (/ (div (unquote (first args)) (unquote (first (rest args)))) (unquote-splicing (rest (rest args)))))))))
 
 ; Chained comparison macros - provide familiar syntax while keeping host impl simple
 ; These expand multi-argument comparisons into chained 'and' expressions
@@ -134,45 +134,45 @@
 (defmacro = [&rest args]
   (if (eq args null)
     (quote true)
-    (if (eq (cdr args) null)
+    (if (eq (rest args) null)
       (quote true)
-      (if (eq (cdr (cdr args)) null)
-        (quasiquote (eq (unquote (car args)) (unquote (car (cdr args)))))
-        (quasiquote (and (eq (unquote (car args)) (unquote (car (cdr args))))
-                         (= (unquote-splicing (cdr args)))))))))
+      (if (eq (rest (rest args)) null)
+        (quasiquote (eq (unquote (first args)) (unquote (first (rest args)))))
+        (quasiquote (and (eq (unquote (first args)) (unquote (first (rest args))))
+                         (= (unquote-splicing (rest args)))))))))
 
 ; < macro - chained less-than
 (defmacro < [&rest args]
-  (if (eq (cdr args) null)
+  (if (eq (rest args) null)
     (quote true)
-    (if (eq (cdr (cdr args)) null)
-      (quasiquote (lt (unquote (car args)) (unquote (car (cdr args)))))
-      (quasiquote (and (lt (unquote (car args)) (unquote (car (cdr args))))
-                       (< (unquote-splicing (cdr args))))))))
+    (if (eq (rest (rest args)) null)
+      (quasiquote (lt (unquote (first args)) (unquote (first (rest args)))))
+      (quasiquote (and (lt (unquote (first args)) (unquote (first (rest args))))
+                       (< (unquote-splicing (rest args))))))))
 
 ; > macro - chained greater-than
 (defmacro > [&rest args]
-  (if (eq (cdr args) null)
+  (if (eq (rest args) null)
     (quote true)
-    (if (eq (cdr (cdr args)) null)
-      (quasiquote (gt (unquote (car args)) (unquote (car (cdr args)))))
-      (quasiquote (and (gt (unquote (car args)) (unquote (car (cdr args))))
-                       (> (unquote-splicing (cdr args))))))))
+    (if (eq (rest (rest args)) null)
+      (quasiquote (gt (unquote (first args)) (unquote (first (rest args)))))
+      (quasiquote (and (gt (unquote (first args)) (unquote (first (rest args))))
+                       (> (unquote-splicing (rest args))))))))
 
 ; <= macro - chained less-than-or-equal
 (defmacro <= [&rest args]
-  (if (eq (cdr args) null)
+  (if (eq (rest args) null)
     (quote true)
-    (if (eq (cdr (cdr args)) null)
-      (quasiquote (lte (unquote (car args)) (unquote (car (cdr args)))))
-      (quasiquote (and (lte (unquote (car args)) (unquote (car (cdr args))))
-                       (<= (unquote-splicing (cdr args))))))))
+    (if (eq (rest (rest args)) null)
+      (quasiquote (lte (unquote (first args)) (unquote (first (rest args)))))
+      (quasiquote (and (lte (unquote (first args)) (unquote (first (rest args))))
+                       (<= (unquote-splicing (rest args))))))))
 
 ; >= macro - chained greater-than-or-equal
 (defmacro >= [&rest args]
-  (if (eq (cdr args) null)
+  (if (eq (rest args) null)
     (quote true)
-    (if (eq (cdr (cdr args)) null)
-      (quasiquote (gte (unquote (car args)) (unquote (car (cdr args)))))
-      (quasiquote (and (gte (unquote (car args)) (unquote (car (cdr args))))
-                       (>= (unquote-splicing (cdr args))))))))
+    (if (eq (rest (rest args)) null)
+      (quasiquote (gte (unquote (first args)) (unquote (first (rest args)))))
+      (quasiquote (and (gte (unquote (first args)) (unquote (first (rest args))))
+                       (>= (unquote-splicing (rest args))))))))

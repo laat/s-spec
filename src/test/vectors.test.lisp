@@ -3,16 +3,16 @@
 (test "array literals"
   ; Note: We can't check internal structure like TypeScript,
   ; but we can verify arrays work correctly with operations
-  (assert/equal (length [1 2 3]) 3)
-  (assert/equal (length []) 0)
+  (assert/equal (count [1 2 3]) 3)
+  (assert/equal (count []) 0)
   (assert/equal (nth [1 "hello" true null] 0) 1)
   (assert/equal (nth [1 "hello" true null] 1) "hello")
   (assert/equal (nth [1 "hello" true null] 2) true)
   (assert/equal (nth [1 "hello" true null] 3) null))
 
 (test "array function"
-  (assert/equal (length (array 1 2 3)) 3)
-  (assert/equal (length (array)) 0)
+  (assert/equal (count (array 1 2 3)) 3)
+  (assert/equal (count (array)) 0)
   (assert/equal (= (array (+ 1 2) (* 3 4)) [3 12]) true))
 
 (test "array? predicate"
@@ -36,23 +36,23 @@
   (assert/throws (fn [] (nth 42 0)) "nth requires an array")
   (assert/throws (fn [] (nth [1 2 3] "a")) "nth requires number for argument 2"))
 
-(test "length"
-  (assert/equal (length [1 2 3]) 3)
-  (assert/equal (length []) 0)
-  (assert/equal (length [1]) 1)
-  (assert/equal (length (list 1 2 3)) 3)
-  (assert/equal (length (list)) 0)
-  (assert/equal (length null) 0))
+(test "count"
+  (assert/equal (count [1 2 3]) 3)
+  (assert/equal (count []) 0)
+  (assert/equal (count [1]) 1)
+  (assert/equal (count (list 1 2 3)) 3)
+  (assert/equal (count (list)) 0)
+  (assert/equal (count null) 0))
 
-(test "length error"
-  (assert/throws (fn [] (length 42)) "length requires an array or list"))
+(test "count error"
+  (assert/throws (fn [] (count 42)) "count requires an array, list, or sequence"))
 
 (test "push"
   (assert/equal (= (push [1 2] 3) [1 2 3]) true)
   (assert/equal (= (push [] 1) [1]) true)
   (def v [1 2])
   (def v2 (push v 3))
-  (assert/equal (length v) 2)
+  (assert/equal (count v) 2)
   (assert/throws (fn [] (push 42 1)) "push requires an array"))
 
 (test "arrays in functions"
@@ -64,7 +64,7 @@
   (assert/equal (nth (make-range 10) 1) 11))
 
 (test "arrays with keywords"
-  (assert/equal (length [:foo :bar]) 2))
+  (assert/equal (count [:foo :bar]) 2))
 
 (test "array literal in def"
   (def nums [1 2 3])
@@ -75,7 +75,7 @@
   (assert/equal (nth (nth matrix 1) 0) 3))
 
 (test "array with null elements"
-  (assert/equal (length [null null null]) 3)
+  (assert/equal (count [null null null]) 3)
   (assert/equal (nth [null null null] 0) null))
 
 (test "empty array equality"
@@ -85,6 +85,6 @@
   (assert/equal (= [1, 2, 3] [1 2 3]) true)
   (assert/equal (= ["a", "b", "c"] ["a" "b" "c"]) true)
   (assert/equal (= [1, "hello", true, null] [1 "hello" true null]) true)
-  (assert/equal (length [[1, 2], [3, 4]]) 2)
+  (assert/equal (count [[1, 2], [3, 4]]) 2)
   (assert/equal (= [1, 2, 3,] [1 2 3]) true)
   (assert/equal (= [1, 2 3, 4] [1 2 3 4]) true))

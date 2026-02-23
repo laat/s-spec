@@ -4,7 +4,7 @@
   (defn sum-list [lst]
     (if (empty? lst)
       0
-      (+ (car lst) (sum-list (cdr lst)))))
+      (+ (first lst) (sum-list (rest lst)))))
   (defn sum [&rest nums] (sum-list nums))
   (assert/equal (sum 1 2 3 4) 10))
 
@@ -13,7 +13,7 @@
   (assert/equal (empty? (identity)) true))
 
 (test "variadic fn - one rest arg"
-  (defn get-first [&rest nums] (car nums))
+  (defn get-first [&rest nums] (first nums))
   (assert/equal (get-first 42) 42))
 
 (test "variadic fn - required + rest"
@@ -30,26 +30,26 @@
   (defn count-list [lst]
     (if (empty? lst)
       0
-      (+ 1 (count-list (cdr lst)))))
+      (+ 1 (count-list (rest lst)))))
   (defn count-rest [first &rest rest]
     (count-list rest))
   (assert/equal (count-rest 1 2 3 4 5) 4))
 
 (test "list - creates list from args"
   ; Can't check internal structure in Lisp, but verify it works
-  (assert/equal (car (list 1 2 3)) 1)
+  (assert/equal (first (list 1 2 3)) 1)
   (assert/equal (list) null))
 
-(test "car - gets first element"
-  (assert/equal (car (list 1 2 3)) 1)
-  (assert/equal (car (list)) null)
-  (assert/equal (car null) null))
+(test "first - gets first element"
+  (assert/equal (first (list 1 2 3)) 1)
+  (assert/equal (first (list)) null)
+  (assert/equal (first null) null))
 
-(test "cdr - gets remaining elements"
-  (assert/equal (car (cdr (list 1 2 3))) 2)
-  (assert/equal (cdr (list 1)) null)
-  (assert/equal (cdr (list)) null)
-  (assert/equal (cdr null) null))
+(test "rest - gets remaining elements"
+  (assert/equal (first (rest (list 1 2 3))) 2)
+  (assert/equal (rest (list 1)) null)
+  (assert/equal (rest (list)) null)
+  (assert/equal (rest null) null))
 
 (test "empty? - on lists"
   (assert/equal (empty? (list)) true)
@@ -58,7 +58,7 @@
 
 (test "variadic macro - simple"
   (defmacro when [cond &rest body]
-    (quasiquote (if (unquote cond) (unquote (car body)) null)))
+    (quasiquote (if (unquote cond) (unquote (first body)) null)))
   (assert/equal (when true 42) 42)
   (assert/equal (when true (+ 1 2)) 3))
 
@@ -70,4 +70,4 @@
 
 (test "variadic - collect all args"
   (defn collect-all [&rest items] items)
-  (assert/equal (car (collect-all "a" "b" "c")) "a"))
+  (assert/equal (first (collect-all "a" "b" "c")) "a"))

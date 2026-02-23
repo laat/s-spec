@@ -76,6 +76,35 @@
   (assert/equal (= (if true {:x 1} {:y 2}) {:x 1}) true)
   (assert/equal (= (and true {:x 1}) {:x 1}) true))
 
+(test "keys returns a sequence"
+  (def ks (keys {:a 1 :b 2}))
+  (assert/equal (count ks) 2)
+  (assert/equal (empty? ks) false)
+  (assert/equal (or (= (first ks) :a) (= (first ks) :b)) true))
+
+(test "vals returns a sequence"
+  (def vs (vals {:a 1 :b 2}))
+  (assert/equal (count vs) 2)
+  (assert/equal (or (= (first vs) 1) (= (first vs) 2)) true))
+
+(test "entries returns keyword-value pair lists"
+  (def es (entries {:a 1 :b 2}))
+  (def e1 (first es))
+  (assert/equal (count es) 2)
+  (assert/equal (or (= (first e1) :a) (= (first e1) :b)) true)
+  (assert/equal (or (= (first (rest e1)) 1) (= (first (rest e1)) 2)) true)
+  (assert/equal (rest (rest e1)) null))
+
+(test "keys vals entries - empty object"
+  (assert/equal (keys {}) null)
+  (assert/equal (vals {}) null)
+  (assert/equal (entries {}) null))
+
+(test "keys vals entries - type errors"
+  (assert/throws (fn [] (keys 42)) "keys requires an object")
+  (assert/throws (fn [] (vals 42)) "vals requires an object")
+  (assert/throws (fn [] (entries 42)) "entries requires an object"))
+
 (test "maps with commas"
   (assert/equal (= {:name "John", :age 30} {:name "John" :age 30}) true)
   (assert/equal (= {:a 1, :b 2, :c 3} {:a 1 :b 2 :c 3}) true)

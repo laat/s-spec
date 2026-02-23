@@ -177,6 +177,7 @@ runLispTestFile(join(__dirname, "test/load.test.lisp"));
 runLispTestFile(join(__dirname, "test/regex.test.lisp"));
 runLispTestFile(join(__dirname, "test/macros.test.lisp"));
 runLispTestFile(join(__dirname, "test/gensym.test.lisp"));
+runLispTestFile(join(__dirname, "test/seq.test.lisp"));
 runLispTestFile(join(__dirname, "test/type-safety.test.lisp"));
 runLispTestFile(join(__dirname, "test/recursion-depth.test.lisp"));
 runLispTestFile(join(__dirname, "test/edge-cases.test.lisp"));

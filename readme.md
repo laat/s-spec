@@ -9,8 +9,8 @@ This is an early reference implementation with a complete Lisp interpreter found
 - **Literals**: numbers, strings, booleans (`true`, `false`), `null`, keywords (`:keyword`), objects (`{:key value}`), arrays (`[1 2 3]`)
 - **Keywords**: Clojure-style keywords (`:name`, `:"any key"`) for tags and object keys
 - **Objects**: JavaScript object literals (`{:key "value"}`) with keyword or string keys
-- **Arrays**: JSON-style arrays with random access (`[1 2 3]`), operations: `array`, `nth`, `length`, `push`, `array?`
-- **Lists**: Cons cell linked lists for s-expressions, operations: `list`, `cons`, `car`, `cdr`
+- **Arrays**: JSON-style arrays with random access (`[1 2 3]`), operations: `array`, `nth`, `count`, `push`, `array?`
+- **Lists**: Cons cell linked lists for s-expressions, operations: `list`, `cons`, `first`, `rest`, `seq`
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Comparison operators**: `=`, `>`, `<`, `>=`, `<=` (with chained comparisons and deep equality)
 - **Logical operators**: `and`, `or`, `not` (with null punning)
@@ -110,6 +110,11 @@ node dist/index.js '(log "Hello from s-spec!")'
 (= {:a 1} {:a 2})                ; => false
 (= {:a {:b 1}} {:a {:b 1}})      ; => true
 
+; Object iteration (in insertion order)
+(keys {:a 1 :b 2})               ; => (:a :b)
+(vals {:a 1 :b 2})               ; => (1 2)
+(entries {:a 1 :b 2})            ; => ((:a 1) (:b 2))
+
 ; Objects with keyword values
 {:status :active :type :user}    ; => {status: :active, type: :user}
 
@@ -123,7 +128,7 @@ node dist/index.js '(log "Hello from s-spec!")'
 ; Array operations
 (nth [10 20 30] 1)               ; => 20 (zero-indexed access)
 (nth [10 20 30] 10)              ; => null (out of bounds)
-(length [1 2 3])                 ; => 3 (like JSON array.length)
+(count [1 2 3])                  ; => 3 (JSON array element count)
 (push [1 2] 3)                   ; => [1 2 3] (append, returns new array)
 (array? [1 2 3])                 ; => true (type check)
 (array? (list 1 2 3))            ; => false
@@ -135,9 +140,15 @@ node dist/index.js '(log "Hello from s-spec!")'
 ; Lists - cons cell linked lists (for code/data)
 (list 1 2 3)                     ; => (1 2 3) as cons cells
 (cons 1 (cons 2 null))            ; => (1 2) manual construction
-(car (list 1 2 3))               ; => 1 (first element)
-(cdr (list 1 2 3))               ; => (2 3) (rest)
-(length (list 1 2 3))            ; => 3 (works on lists too)
+(first (list 1 2 3))               ; => 1 (first element)
+(rest (list 1 2 3))               ; => (2 3) (rest)
+(count (list 1 2 3))            ; => 3 (works on lists too)
+
+; seq - lazy sequence view for arrays/lists
+(def s (seq [10 20 30]))         ; => sequence (no array copy)
+(first s)                          ; => 10
+(first (rest s))                    ; => 20
+(count (rest s))                 ; => 2
 
 ; Variable binding
 (def x 42)            ; define a global variable
@@ -380,7 +391,7 @@ The entire implementation is in a single file (`src/index.ts`, ~800 lines) with 
 
 **Data structures:**
 
-- **Cons cells** `{car, cdr}` - Classic Lisp linked lists for s-expressions
+- **Cons cells** `{car, cdr}` - Classic Lisp linked lists for s-expressions (accessed with `first`/`rest`)
 - **Arrays** `{vec: Expr[]}` - JSON-style random-access arrays
 - **Maps** - JavaScript objects for key-value data
 - **Keywords** - Symbolic identifiers for tags and enum values
