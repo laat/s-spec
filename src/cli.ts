@@ -1,7 +1,8 @@
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { inspect } from "node:util";
 import {
   lex,
   parse,
@@ -13,6 +14,9 @@ import {
   SSpecError,
   isCallable,
   evaluate,
+  BuiltinFunction,
+  isExpr,
+  isPlainObject,
 } from "./index.ts";
 
 const VERSION = "0.0.1";
@@ -75,18 +79,6 @@ function formatValueRecursive(value: any): string {
     return "<function>";
   }
 
-  // AST nodes (keywords, symbols, cons cells, etc.)
-  if (typeof value === "object" && "type" in value) {
-    if (value.type === "keyword") {
-      return `:${value.kw}`;
-    }
-    if (value.type === "symbol") {
-      return value.sym;
-    }
-    // For other AST nodes (cons cells, etc), use toSExpr
-    return toSExpr(value);
-  }
-
   // Primitives
   if (typeof value === "string") {
     return `"${value}"`;
@@ -101,12 +93,24 @@ function formatValueRecursive(value: any): string {
     return `[${elements.join(", ")}]`;
   }
 
-  // Plain objects
-  if (typeof value === "object") {
+  // Plain objects (user data, not AST nodes)
+  if (isPlainObject(value)) {
     const entries = Object.entries(value).map(
       ([key, val]) => `"${key}": ${formatValueRecursive(val)}`
     );
     return `{${entries.join(", ")}}`;
+  }
+
+  // AST nodes (keywords, symbols, cons cells, etc.)
+  if (isExpr(value)) {
+    if (value.type === "keyword") {
+      return `:${value.kw}`;
+    }
+    if (value.type === "symbol") {
+      return value.sym;
+    }
+    // For other AST nodes (cons cells, etc), use toSExpr
+    return toSExpr(value);
   }
 
   return String(value);
@@ -124,12 +128,71 @@ function formatValue(value: any): string {
 }
 
 /**
+ * Create REPL-only builtin functions
+ */
+function createReplBuiltins(): Record<string, BuiltinFunction> {
+  return {
+    slurp: new BuiltinFunction((args, env) => {
+      if (args.length !== 1) {
+        throw new SSpecError("slurp requires 1 argument (path or URL)");
+      }
+
+      const pathOrUrl = args[0];
+      if (typeof pathOrUrl !== "string") {
+        throw new SSpecError("slurp requires a string argument");
+      }
+
+      let content: string;
+
+      if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+        throw new SSpecError("slurp with URLs not yet supported in synchronous context - use await in async version");
+      } else {
+        const resolvedPath = resolve(pathOrUrl);
+        if (!existsSync(resolvedPath)) {
+          throw new SSpecError(`File not found: ${resolvedPath}`);
+        }
+        content = readFileSync(resolvedPath, "utf-8");
+      }
+
+      const data = JSON.parse(content);
+
+      const convertToSSpec = (value: any): any => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+        if (typeof value === "object" && !Array.isArray(value)) {
+          const obj: Record<string, any> = {};
+          for (const [k, v] of Object.entries(value)) {
+            obj[k] = convertToSSpec(v);
+          }
+          return obj;
+        }
+        if (Array.isArray(value)) {
+          return value.map(convertToSSpec);
+        }
+        return value;
+      };
+
+      return convertToSSpec(data);
+    }),
+
+    inspect: new BuiltinFunction((args, env) => {
+      if (args.length !== 1) {
+        throw new SSpecError("inspect requires 1 argument");
+      }
+      console.log(inspect(args[0], { depth: null, colors: true }));
+      return null;
+    }),
+  };
+}
+
+/**
  * Handle REPL commands (lines starting with .)
  */
-function handleCommand(
+async function handleCommand(
   command: string,
   env: Environment,
-): { newEnv?: Environment; exit?: boolean } {
+): Promise<{ newEnv?: Environment; exit?: boolean }> {
   const trimmed = command.trim();
 
   if (trimmed === ".exit" || trimmed === ".quit") {
@@ -143,6 +206,16 @@ s-spec REPL Commands:
   .exit, .quit       Exit the REPL (or press Ctrl+D)
   .reset             Reset environment to initial state
   .expand <expr>     Show macro expansion of <expr>
+  .inspect <expr>    Inspect value with full depth and colors
+  .load <path>       Load and evaluate s-spec code from file
+  .slurp <path|url> [symbol]   Load JSON from file or HTTP(S) URL into symbol (default: it)
+
+REPL-only functions:
+  (slurp path)       Load JSON from local file and return parsed data
+  (inspect value)    Display value with full depth and colors
+
+Standard functions:
+  (load path)        Load and evaluate s-spec code from file
 
 To evaluate an expression, just type it and press Enter.
 Multi-line expressions are supported - the REPL will wait for balanced parentheses.
@@ -152,7 +225,13 @@ Multi-line expressions are supported - the REPL will wait for balanced parenthes
 
   if (trimmed === ".reset") {
     console.log("Environment reset.");
-    return { newEnv: createEnv() };
+    const newEnv = createEnv();
+    // Re-add REPL-only builtins
+    const replBuiltins = createReplBuiltins();
+    for (const [name, fn] of Object.entries(replBuiltins)) {
+      newEnv.set(name, fn);
+    }
+    return { newEnv };
   }
 
   if (trimmed.startsWith(".expand ")) {
@@ -166,6 +245,173 @@ Multi-line expressions are supported - the REPL will wait for balanced parenthes
       }
       const expanded = macroExpand(exprs[0], env);
       console.log(toSExpr(expanded));
+    } catch (e) {
+      console.error(`Error: ${(e as Error).message}`);
+    }
+    return {};
+  }
+
+  if (trimmed.startsWith(".inspect ")) {
+    const expr = trimmed.slice(9).trim();
+    try {
+      const tokens = lex(expr);
+      const exprs = parse(tokens);
+      if (exprs.length === 0) {
+        console.log("No expression to inspect");
+        return {};
+      }
+      const expanded = macroExpand(exprs[0], env);
+      const result = evalExpr(expanded, env);
+
+      // Call the inspect builtin function
+      const inspectFn = env.get("inspect");
+      if (isCallable(inspectFn)) {
+        inspectFn.call([result], env);
+      }
+    } catch (e) {
+      console.error(`Error: ${(e as Error).message}`);
+    }
+    return {};
+  }
+
+  if (trimmed.startsWith(".load ")) {
+    const rest = trimmed.slice(6).trim();
+    try {
+      let filePath: string;
+
+      // Parse file path (quoted or unquoted)
+      if (rest.startsWith('"')) {
+        // Quoted path
+        let i = 1;
+        let path = "";
+        let escaped = false;
+        while (i < rest.length) {
+          if (escaped) {
+            path += rest[i];
+            escaped = false;
+          } else if (rest[i] === "\\") {
+            escaped = true;
+          } else if (rest[i] === '"') {
+            filePath = path;
+            break;
+          } else {
+            path += rest[i];
+          }
+          i++;
+        }
+        if (!filePath!) {
+          throw new Error("Unterminated string in .load path");
+        }
+      } else {
+        // Unquoted path
+        filePath = rest.split(/\s+/)[0];
+      }
+
+      // Force reload: remove from loadedFiles set before calling load
+      const rootEnv = env.root();
+      const baseDir = rootEnv.currentFile ? dirname(rootEnv.currentFile) : process.cwd();
+      const resolvedPath = resolve(baseDir, filePath);
+      rootEnv.loadedFiles.delete(resolvedPath);
+
+      // Call the load builtin function
+      const loadFn = env.get("load");
+      if (isCallable(loadFn)) {
+        loadFn.call([filePath], env);
+        console.log(`Loaded '${filePath}'`);
+      }
+    } catch (e) {
+      console.error(`Error: ${(e as Error).message}`);
+    }
+    return {};
+  }
+
+  if (trimmed.startsWith(".slurp ")) {
+    const rest = trimmed.slice(7).trim();
+    try {
+      // Parse first argument (path)
+      const firstQuote = rest.indexOf('"');
+      let pathOrUrl: string;
+      let symbolName = "it";
+
+      if (firstQuote === 0) {
+        // Quoted path
+        let i = 1;
+        let path = "";
+        let escaped = false;
+        while (i < rest.length) {
+          if (escaped) {
+            path += rest[i];
+            escaped = false;
+          } else if (rest[i] === "\\") {
+            escaped = true;
+          } else if (rest[i] === '"') {
+            pathOrUrl = path;
+            // Check for symbol name after path
+            const remaining = rest.slice(i + 1).trim();
+            if (remaining) {
+              const symbolMatch = remaining.match(/^(\S+)/);
+              if (symbolMatch) {
+                symbolName = symbolMatch[1];
+              }
+            }
+            break;
+          } else {
+            path += rest[i];
+          }
+          i++;
+        }
+        if (!pathOrUrl!) {
+          throw new Error("Unterminated string in .slurp path");
+        }
+      } else {
+        // Unquoted path
+        const parts = rest.split(/\s+/);
+        pathOrUrl = parts[0];
+        if (parts[1]) {
+          symbolName = parts[1];
+        }
+      }
+
+      // Handle URLs vs files differently
+      let content: string;
+      if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+        // Async fetch for URLs
+        const response = await fetch(pathOrUrl);
+        if (!response.ok) {
+          throw new SSpecError(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        content = await response.text();
+      } else {
+        // Sync file read
+        const resolvedPath = resolve(pathOrUrl);
+        if (!existsSync(resolvedPath)) {
+          throw new SSpecError(`File not found: ${resolvedPath}`);
+        }
+        content = readFileSync(resolvedPath, "utf-8");
+      }
+
+      const data = JSON.parse(content);
+
+      const convertToSSpec = (value: any): any => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+        if (typeof value === "object" && !Array.isArray(value)) {
+          const obj: Record<string, any> = {};
+          for (const [k, v] of Object.entries(value)) {
+            obj[k] = convertToSSpec(v);
+          }
+          return obj;
+        }
+        if (Array.isArray(value)) {
+          return value.map(convertToSSpec);
+        }
+        return value;
+      };
+
+      const sspecValue = convertToSSpec(data);
+      env.set(symbolName, sspecValue);
+      console.log(`Loaded into '${symbolName}'`);
     } catch (e) {
       console.error(`Error: ${(e as Error).message}`);
     }
@@ -211,15 +457,33 @@ async function startRepl(): Promise<void> {
 
   const rl = readline.createInterface({ input, output });
   let env = createEnv();
+
+  // Add REPL-only builtins
+  const replBuiltins = createReplBuiltins();
+  for (const [name, fn] of Object.entries(replBuiltins)) {
+    env.set(name, fn);
+  }
+
   let buffer = "";
   let inMultiLine = false;
 
   try {
     while (true) {
       const prompt = inMultiLine ? "....... " : "s-spec> ";
-      const line = await rl.question(prompt);
 
-      // Handle Ctrl+D (null input)
+      let line: string;
+      try {
+        line = await rl.question(prompt);
+      } catch (e) {
+        // Handle Ctrl+D (AbortError)
+        if ((e as Error).name === "AbortError") {
+          console.log("\nBye!");
+          break;
+        }
+        throw e;
+      }
+
+      // Handle Ctrl+D (null input - older Node versions)
       if (line === null) {
         console.log("\nBye!");
         break;
@@ -230,7 +494,7 @@ async function startRepl(): Promise<void> {
 
       // Check for commands (only on first line, not in multi-line mode)
       if (!inMultiLine && buffer.trim().startsWith(".")) {
-        const result = handleCommand(buffer, env);
+        const result = await handleCommand(buffer, env);
         if (result.exit) {
           console.log("Bye!");
           break;
@@ -311,6 +575,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (!arg) {
     // No arguments: start REPL
     startRepl().catch((e) => {
+      // Ignore AbortError (Ctrl+D) - it's a normal exit
+      if ((e as Error).name === "AbortError") {
+        return;
+      }
       console.error("REPL error:", e);
       process.exit(1);
     });

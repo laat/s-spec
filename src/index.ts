@@ -1832,4 +1832,6 @@ export {
   BuiltinFunction,
   isCallable,
   builtins,
+  isExpr,
+  isPlainObject,
 };
