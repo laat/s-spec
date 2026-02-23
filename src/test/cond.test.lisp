@@ -24,15 +24,15 @@
       :else 3)
     3))
 
-(test "cond - no else, no match returns nil"
+(test "cond - no else, no match returns null"
   (assert/equal
     (cond
       false 1
       false 2)
-    nil))
+    null))
 
-(test "cond - empty cond returns nil"
-  (assert/equal (cond) nil))
+(test "cond - empty cond returns null"
+  (assert/equal (cond) null))
 
 (test "cond - with expressions"
   (def x 5)
@@ -43,10 +43,10 @@
       :else "zero")
     "positive"))
 
-(test "cond - nil and false are falsy"
+(test "cond - null and false are falsy"
   (assert/equal
     (cond
-      nil 1
+      null 1
       false 2
       :else 3)
     3))
@@ -134,7 +134,7 @@
     (cond
       (< 5 3) "impossible"
       (> 2 10) "also impossible")
-    nil))
+    null))
 
 (test "cond - single clause with else"
   (assert/equal

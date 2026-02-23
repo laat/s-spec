@@ -17,8 +17,8 @@
   (assert/equal (= {:kw-key 1 "str-key" 2} {:kw-key 1 "str-key" 2}) true))
 
 (test "map with mixed value types"
-  (assert/equal (= {:str "hello" :num 42 :bool true :nil nil}
-                   {:str "hello" :num 42 :bool true :nil nil}) true))
+  (assert/equal (= {:str "hello" :num 42 :bool true :null null}
+                   {:str "hello" :num 42 :bool true :null null}) true))
 
 (test "map with keyword values"
   (assert/equal (= {:status :active :type :user} {:status :active :type :user}) true))

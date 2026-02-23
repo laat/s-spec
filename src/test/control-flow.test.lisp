@@ -3,7 +3,7 @@
 (test "not - logical negation"
   (assert/equal (not true) false)
   (assert/equal (not false) true)
-  (assert/equal (not nil) true)
+  (assert/equal (not null) true)
   (assert/equal (not 0) false)
   (assert/equal (not 1) false)
   (assert/equal (not 42) false)
@@ -13,7 +13,7 @@
 
 (test "not - composition"
   (assert/equal (not (and true false)) true)
-  (assert/equal (not (or false nil)) true)
+  (assert/equal (not (or false null)) true)
   (assert/equal (and (not false) true) true))
 
 (test "not - wrong arity"
@@ -31,12 +31,12 @@
   (assert/equal (if "hello" "yes" "no") "yes"))
 
 (test "if - falsy values"
-  (assert/equal (if nil "yes" "no") "no")
+  (assert/equal (if null "yes" "no") "no")
   (assert/equal (if false "yes" "no") "no"))
 
 (test "if - without else clause"
   (assert/equal (if true 42) 42)
-  (assert/equal (if false 42) nil))
+  (assert/equal (if false 42) null))
 
 (test "if - with expressions"
   (assert/equal (if (> 5 3) (+ 1 2) (- 10 5)) 3)
@@ -83,6 +83,6 @@
 (test "recursive - countdown"
   (defn countdown [n]
     (if (= n 0)
-      nil
+      null
       (countdown (- n 1))))
-  (assert/equal (countdown 3) nil))
+  (assert/equal (countdown 3) null))

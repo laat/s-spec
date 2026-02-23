@@ -44,15 +44,15 @@
 
 (test "defmacro - when macro"
   (defmacro when [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
+    (quasiquote (if (unquote cond) (unquote body) null)))
   (assert/equal (when true 42) 42)
-  (assert/equal (when false 42) nil))
+  (assert/equal (when false 42) null))
 
 (test "defmacro - unless macro"
   (defmacro unless [cond body]
-    (quasiquote (if (unquote cond) nil (unquote body))))
+    (quasiquote (if (unquote cond) null (unquote body))))
   (assert/equal (unless false 42) 42)
-  (assert/equal (unless true 42) nil))
+  (assert/equal (unless true 42) null))
 
 (test "defn macro from stdlib"
   (defn triple [x] (* x 3))
@@ -80,7 +80,7 @@
 
 (test "macro expansion - recursive expansion"
   (defmacro when [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
+    (quasiquote (if (unquote cond) (unquote body) null)))
   (defmacro unless [cond body]
     (quasiquote (when (not (unquote cond)) (unquote body))))
   (assert/equal (unless false 100) 100))
@@ -97,9 +97,9 @@
 
 (test "macro - can generate def forms"
   (defmacro defvar [name]
-    (quasiquote (def (unquote name) nil)))
+    (quasiquote (def (unquote name) null)))
   (defvar foo)
-  (assert/equal foo nil))
+  (assert/equal foo null))
 
 (test "complex macro - cond-style conditional"
   (defmacro cond2 [test1 result1 test2 result2]
@@ -107,12 +107,12 @@
                     (unquote result1)
                     (if (unquote test2)
                         (unquote result2)
-                        nil))))
+                        null))))
   (assert/equal (cond2 false 1 true 2) 2))
 
 (test "macros compose with functions"
   (defmacro when [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
+    (quasiquote (if (unquote cond) (unquote body) null)))
   (defn check [x]
     (when (> x 10) (* x 2)))
   (assert/equal (check 15) 30))
@@ -128,13 +128,13 @@
 
 (test "expansion - when macro expands to if"
   (defmacro when [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
-  (assert/equal (to-sexpr (expand (quote (when test-cond result-expr)))) "(if test-cond result-expr nil)"))
+    (quasiquote (if (unquote cond) (unquote body) null)))
+  (assert/equal (to-sexpr (expand (quote (when test-cond result-expr)))) "(if test-cond result-expr null)"))
 
 (test "expansion - unless macro expands to if"
   (defmacro my-unless [cond body]
-    (quasiquote (if (unquote cond) nil (unquote body))))
-  (assert/equal (to-sexpr (expand (quote (my-unless test-cond result-expr)))) "(if test-cond nil result-expr)"))
+    (quasiquote (if (unquote cond) null (unquote body))))
+  (assert/equal (to-sexpr (expand (quote (my-unless test-cond result-expr)))) "(if test-cond null result-expr)"))
 
 (test "expansion - defn macro from stdlib"
   ; expand only does one level, so * won't be expanded yet
@@ -157,13 +157,13 @@
 
 (test "expansion - nested macro calls"
   (defmacro my-when [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
+    (quasiquote (if (unquote cond) (unquote body) null)))
   ; expand only does one level, so = won't be expanded yet
-  (assert/equal (to-sexpr (expand (quote (my-when (= 1 2) result)))) "(if (= 1 2) result nil)"))
+  (assert/equal (to-sexpr (expand (quote (my-when (= 1 2) result)))) "(if (= 1 2) result null)"))
 
 (test "expansion - recursive macro expansion"
   (defmacro my-when2 [cond body]
-    (quasiquote (if (unquote cond) (unquote body) nil)))
+    (quasiquote (if (unquote cond) (unquote body) null)))
   (defmacro my-unless2 [cond body]
     (quasiquote (my-when2 (not (unquote cond)) (unquote body))))
   ; expand only does one level, so it expands to my-when2, not all the way to if
@@ -205,7 +205,7 @@
   (assert/equal (to-sexpr 42) "42")
   (assert/equal (to-sexpr "hello") "\"hello\"")
   (assert/equal (to-sexpr true) "true")
-  (assert/equal (to-sexpr nil) "nil")
+  (assert/equal (to-sexpr null) "null")
   (assert/equal (to-sexpr (quote x)) "x")
   (assert/equal (to-sexpr (quote :keyword)) ":keyword"))
 

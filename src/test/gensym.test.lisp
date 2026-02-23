@@ -25,7 +25,7 @@
 (test "gensym - simple macro usage"
   ; Simpler test: macro that uses gensym to create a binding
   (defmacro with-gensym [body] (do (def g (gensym)) (quasiquote (def (unquote g) 42))))
-  (with-gensym nil)
+  (with-gensym null)
   ; The gensym'd variable should exist but we can't reference it by name
   (assert/equal true true))
 

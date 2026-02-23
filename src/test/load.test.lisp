@@ -9,8 +9,8 @@
   (load "src/test/fixtures/simple.lisp")
   (assert/equal (loaded-function 5) 10))
 
-(test "load - returns nil"
-  (assert/equal (load "src/test/fixtures/simple.lisp") nil))
+(test "load - returns null"
+  (assert/equal (load "src/test/fixtures/simple.lisp") null))
 
 (test "load - can load relative paths from loaded files"
   (load "src/test/fixtures/with-deps.lisp")

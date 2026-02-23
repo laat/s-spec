@@ -6,14 +6,14 @@ A minimal, embeddable Lisp DSL for validating and conforming JSON values.
 
 This is an early reference implementation with a complete Lisp interpreter foundation. Currently supports:
 
-- **Literals**: numbers, strings, booleans (`true`, `false`), `nil`, keywords (`:keyword`), objects (`{:key value}`), arrays (`[1 2 3]`)
+- **Literals**: numbers, strings, booleans (`true`, `false`), `null`, keywords (`:keyword`), objects (`{:key value}`), arrays (`[1 2 3]`)
 - **Keywords**: Clojure-style keywords (`:name`, `:"any key"`) for tags and object keys
 - **Objects**: JavaScript object literals (`{:key "value"}`) with keyword or string keys
 - **Arrays**: JSON-style arrays with random access (`[1 2 3]`), operations: `array`, `nth`, `length`, `push`, `array?`
 - **Lists**: Cons cell linked lists for s-expressions, operations: `list`, `cons`, `car`, `cdr`
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Comparison operators**: `=`, `>`, `<`, `>=`, `<=` (with chained comparisons and deep equality)
-- **Logical operators**: `and`, `or`, `not` (with nil punning)
+- **Logical operators**: `and`, `or`, `not` (with null punning)
 - **Control flow**: `if` (with lazy evaluation)
 - **Variable binding**: `def` (global), `let` (local bindings)
 - **Functions**: `fn` (anonymous), `defn` (named - now a macro!)
@@ -122,7 +122,7 @@ node dist/index.js '(log "Hello from s-spec!")'
 
 ; Array operations
 (nth [10 20 30] 1)               ; => 20 (zero-indexed access)
-(nth [10 20 30] 10)              ; => nil (out of bounds)
+(nth [10 20 30] 10)              ; => null (out of bounds)
 (length [1 2 3])                 ; => 3 (like JSON array.length)
 (push [1 2] 3)                   ; => [1 2 3] (append, returns new array)
 (array? [1 2 3])                 ; => true (type check)
@@ -134,7 +134,7 @@ node dist/index.js '(log "Hello from s-spec!")'
 
 ; Lists - cons cell linked lists (for code/data)
 (list 1 2 3)                     ; => (1 2 3) as cons cells
-(cons 1 (cons 2 nil))            ; => (1 2) manual construction
+(cons 1 (cons 2 null))            ; => (1 2) manual construction
 (car (list 1 2 3))               ; => 1 (first element)
 (cdr (list 1 2 3))               ; => (2 3) (rest)
 (length (list 1 2 3))            ; => 3 (works on lists too)
@@ -206,14 +206,14 @@ x                     ; => 100 (outer binding unchanged)
 (valid-age? 21)       ; => true
 (valid-age? 15)       ; => false
 
-; Logical operators with nil punning
+; Logical operators with null punning
 (and 1 2 3)           ; => 3 (returns last value)
 (and true false)      ; => false (short-circuits on first falsy)
-(and 1 nil 3)         ; => nil (nil is falsy)
-(or false nil 42)     ; => 42 (returns first truthy)
-(or nil false)        ; => false (returns last if all falsy)
+(and 1 null 3)         ; => null (null is falsy)
+(or false null 42)     ; => 42 (returns first truthy)
+(or null false)        ; => false (returns last if all falsy)
 
-; Note: only nil, false, and undefined are falsy
+; Note: only null, false, and undefined are falsy
 ; 0 and "" are truthy (like in Lisp)
 (and 0 1)            ; => 1 (0 is truthy!)
 (and "" "x")         ; => "x" (empty string is truthy!)
@@ -221,7 +221,7 @@ x                     ; => 100 (outer binding unchanged)
 ; Logical negation
 (not true)           ; => false
 (not false)          ; => true
-(not nil)            ; => true
+(not null)            ; => true
 (not 0)              ; => false (0 is truthy!)
 (not "")             ; => false ("" is truthy!)
 
@@ -230,8 +230,8 @@ x                     ; => 100 (outer binding unchanged)
 (if false 1 2)       ; => 2
 (if (> 5 3) "yes" "no")  ; => "yes"
 
-; if without else clause returns nil
-(if false 42)        ; => nil
+; if without else clause returns null
+(if false 42)        ; => null
 
 ; Nested conditionals
 (if (> 10 5)
@@ -274,15 +274,15 @@ x                     ; => 100 (outer binding unchanged)
 
 ; defmacro - define macros
 (defmacro when [cond body]
-  (quasiquote (if (unquote cond) (unquote body) nil)))
+  (quasiquote (if (unquote cond) (unquote body) null)))
 (when true 42)       ; => 42
-(when false 42)      ; => nil
+(when false 42)      ; => null
 
 ; unless macro
 (defmacro unless [cond body]
-  (quasiquote (if (unquote cond) nil (unquote body))))
+  (quasiquote (if (unquote cond) null (unquote body))))
 (unless false 42)    ; => 42
-(unless true 42)     ; => nil
+(unless true 42)     ; => null
 
 ; defn is now a macro!
 ; Defined in stdlib.lisp as:
@@ -321,7 +321,7 @@ pi                   ; => 3.14
 (email/check "test@example.com")  ; => true
 
 ; Logging
-(log "Hello!")        ; prints "Hello!" and returns nil
+(log "Hello!")        ; prints "Hello!" and returns null
 
 ; Comments
 ; This is a comment
@@ -398,7 +398,7 @@ The entire implementation is in a single file (`src/index.ts`, ~800 lines) with 
 - **Lazy evaluation** - `if` only evaluates the taken branch
 - **Recursion** - tail-call recursion works (though not optimized)
 - **Standard library** - Lisp code auto-loaded from stdlib.lisp at startup
-- **Nil punning** - only `nil` (represented as JS `null`), `false`, and `undefined` are falsy (0 and "" are truthy!)
+- **Nil punning** - only `null` (represented as JS `null`), `false`, and `undefined` are falsy (0 and "" are truthy!)
 - **Higher-order functions** - functions that take and return functions work naturally
 
 ## Security Considerations

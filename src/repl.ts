@@ -64,7 +64,7 @@ function isBalanced(input: string): boolean {
  */
 function formatValue(value: any): string {
   if (value === null || value === undefined) {
-    return ""; // Don't print nil
+    return ""; // Don't print null
   }
 
   if (isCallable(value)) {

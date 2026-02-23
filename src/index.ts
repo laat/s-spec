@@ -524,7 +524,7 @@ function lex(input: string): Token[] {
         tokens.push({ type: "bool", value: false, ...start });
         continue;
       }
-      if (sym === "nil") {
+      if (sym === "null") {
         tokens.push({ type: "null", value: null, ...start });
         continue;
       }
@@ -689,7 +689,7 @@ function getValueTypeName(v: Value): string {
   if (isNumber(v)) return "number";
   if (isString(v)) return "string";
   if (isBoolean(v)) return "boolean";
-  if (isNil(v)) return "nil";
+  if (isNil(v)) return "null";
   if (isNumberNode(v)) return "number-node";
   if (isStringNode(v)) return "string-node";
   if (isBooleanNode(v)) return "boolean-node";
@@ -800,7 +800,7 @@ const consListToArray = (list: Value): Value[] => {
 
 function toSExpr(expr: Expr | Value): string {
   if (expr == null) {
-    return "nil";
+    return "null";
   }
 
   // Handle primitives (for backward compatibility with runtime values)
@@ -826,7 +826,7 @@ function toSExpr(expr: Expr | Value): string {
       case "boolean":
         return expr.value ? "true" : "false";
       case "null":
-        return "nil";
+        return "null";
       case "symbol":
         return expr.sym;
       case "keyword":
@@ -1007,7 +1007,7 @@ const builtins: Record<string, BuiltinFunction> = {
         if (isString(arg)) return arg;
         if (isNumber(arg)) return String(arg);
         if (isBoolean(arg)) return String(arg);
-        if (isNull(arg)) return "nil";
+        if (isNull(arg)) return "null";
         if (isKeyword(arg)) return `:${arg.kw}`;
         if (isSymbol(arg)) return arg.sym;
         return String(arg);
@@ -1054,8 +1054,8 @@ const builtins: Record<string, BuiltinFunction> = {
     const val = args[0];
     return isSymbol(val);
   }),
-  "nil?": new BuiltinFunction((args, env) => {
-    if (args.length !== 1) throw new SSpecError("nil? requires 1 argument");
+  "null?": new BuiltinFunction((args, env) => {
+    if (args.length !== 1) throw new SSpecError("null? requires 1 argument");
     return isNil(args[0]);
   }),
   "number?": new BuiltinFunction((args, env) => {
@@ -1091,7 +1091,7 @@ const builtins: Record<string, BuiltinFunction> = {
       );
     }
     if (index < 0 || index >= arr.arr.length) {
-      return null; // Return nil for out of bounds (like Clojure)
+      return null; // Return null for out of bounds (like Clojure)
     }
     const element = arr.arr[index];
     // If element is a literal Expr node, extract its value

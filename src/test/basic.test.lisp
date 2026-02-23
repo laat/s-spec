@@ -27,9 +27,9 @@
   (assert/equal (* 2 (+ 3 4)) 14)
   (assert/equal (- (* 5 4) (/ 10 2)) 15))
 
-(test "log returns nil"
-  (assert/equal (log "hello") nil)
-  (assert/equal (log 1 2 3) nil))
+(test "log returns null"
+  (assert/equal (log "hello") null)
+  (assert/equal (log 1 2 3) null))
 
 (test "commas as whitespace"
   (assert/equal (+ 1, 2, 3) 6)

@@ -169,7 +169,7 @@ Object shapes are written as map literals inside `spec` bodies.
 
 `match` is the primitive for discriminated unions — the hard case in JSON schema.
 
-The accessor (e.g. `.type`) is itself a predicate. If the property is absent, nil punning applies: the match does not fire and the whole `match` form is silently skipped. This means `match` composes naturally with optional fields without needing explicit null checks.
+The accessor (e.g. `.type`) is itself a predicate. If the property is absent, null punning applies: the match does not fire and the whole `match` form is silently skipped. This means `match` composes naturally with optional fields without needing explicit null checks.
 
 The match arms are also predicates — not just string literals. A string literal like `"person"` is shorthand for an equality predicate, but any rule works as a discriminator. This means you can match on types, ranges, regex patterns, or any named rule.
 

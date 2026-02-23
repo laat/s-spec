@@ -20,7 +20,7 @@
   (defn make-list [first-item &rest rest-items]
     (list first-item rest-items))
   ; Result should be a list structure - just verify it's truthy
-  (assert/equal (= (make-list 1 2 3) nil) false))
+  (assert/equal (= (make-list 1 2 3) null) false))
 
 (test "variadic fn - required only (no rest args)"
   (defn greet [name &rest titles] name)
@@ -38,27 +38,27 @@
 (test "list - creates list from args"
   ; Can't check internal structure in Lisp, but verify it works
   (assert/equal (car (list 1 2 3)) 1)
-  (assert/equal (list) nil))
+  (assert/equal (list) null))
 
 (test "car - gets first element"
   (assert/equal (car (list 1 2 3)) 1)
-  (assert/equal (car (list)) nil)
-  (assert/equal (car nil) nil))
+  (assert/equal (car (list)) null)
+  (assert/equal (car null) null))
 
 (test "cdr - gets remaining elements"
   (assert/equal (car (cdr (list 1 2 3))) 2)
-  (assert/equal (cdr (list 1)) nil)
-  (assert/equal (cdr (list)) nil)
-  (assert/equal (cdr nil) nil))
+  (assert/equal (cdr (list 1)) null)
+  (assert/equal (cdr (list)) null)
+  (assert/equal (cdr null) null))
 
 (test "empty? - on lists"
   (assert/equal (empty? (list)) true)
-  (assert/equal (empty? nil) true)
+  (assert/equal (empty? null) true)
   (assert/equal (empty? (list 1 2)) false))
 
 (test "variadic macro - simple"
   (defmacro when [cond &rest body]
-    (quasiquote (if (unquote cond) (unquote (car body)) nil)))
+    (quasiquote (if (unquote cond) (unquote (car body)) null)))
   (assert/equal (when true 42) 42)
   (assert/equal (when true (+ 1 2)) 3))
 

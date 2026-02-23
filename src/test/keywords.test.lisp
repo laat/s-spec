@@ -58,9 +58,9 @@
   (assert/equal (:name {:name "John"}) "John")
   (assert/equal (:age {:age 30}) 30))
 
-(test "keyword-as-function - missing key returns nil"
-  (assert/equal (:missing {:nisse "far"}) nil)
-  (assert/equal (:foo {}) nil))
+(test "keyword-as-function - missing key returns null"
+  (assert/equal (:missing {:nisse "far"}) null)
+  (assert/equal (:foo {}) null))
 
 (test "keyword-as-function - with default value"
   (assert/equal (:missing {:nisse "far"} "default") "default")
@@ -85,7 +85,7 @@
 (test "keyword-as-function - error on non-object"
   (assert/throws (fn [] (:key "not-an-object")) "requires an object")
   (assert/throws (fn [] (:key 123)) "requires an object")
-  (assert/throws (fn [] (:key nil)) "requires an object"))
+  (assert/throws (fn [] (:key null)) "requires an object"))
 
 (test "keyword-as-function - error on wrong arity"
   (assert/throws (fn [] (:key)) "requires 1 or 2 arguments")
@@ -100,5 +100,5 @@
 (test "get with default parameter"
   (assert/equal (get {:foo "bar"} :foo "default") "bar")
   (assert/equal (get {} :missing "default") "default")
-  (assert/equal (get {:x nil} :x "default") nil)
+  (assert/equal (get {:x null} :x "default") null)
   (assert/equal (get {:y 0} :y "default") 0))

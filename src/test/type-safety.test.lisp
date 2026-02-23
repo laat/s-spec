@@ -9,8 +9,8 @@
 (test "sub - type error on boolean arg"
   (assert/throws (fn [] (sub true 5)) "sub requires number for argument 1"))
 
-(test "mul - type error on nil arg"
-  (assert/throws (fn [] (mul nil 5)) "mul requires number for argument 1"))
+(test "mul - type error on null arg"
+  (assert/throws (fn [] (mul null 5)) "mul requires number for argument 1"))
 
 (test "div - type error before division by zero check"
   (assert/throws (fn [] (div "10" 0)) "div requires number for argument 1"))
@@ -35,7 +35,7 @@
   (assert/throws (fn [] (- 10 true)) "sub requires number for argument"))
 
 (test "* macro with type error"
-  (assert/throws (fn [] (* 2 3 nil)) "mul requires number for argument"))
+  (assert/throws (fn [] (* 2 3 null)) "mul requires number for argument"))
 
 (test "/ macro with type error"
   (assert/throws (fn [] (/ 10 "2")) "div requires number for argument"))
