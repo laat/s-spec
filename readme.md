@@ -115,6 +115,15 @@ node dist/index.js '(log "Hello from s-spec!")'
 (vals {:a 1 :b 2})               ; => (1 2)
 (entries {:a 1 :b 2})            ; => ((:a 1) (:b 2))
 
+; Object helpers (immutable)
+(has? {:a 1 :b null} :b)         ; => true (present, even if value is null)
+(get {:a 1} :a)                  ; => 1
+(get {:a 1} :missing "default") ; => "default"
+(assoc {:a 1} :b 2 :a 3)         ; => {:a 3 :b 2}
+(dissoc {:a 1 :b 2} :a)          ; => {:b 2}
+(merge {:a 1} {:b 2} {:a 9})     ; => {:a 9 :b 2}
+(select-keys {:a 1 :b 2 :c 3} (list :a :c)) ; => {:a 1 :c 3}
+
 ; Objects with keyword values
 {:status :active :type :user}    ; => {status: :active, type: :user}
 

@@ -885,6 +885,49 @@ function arrayElementToValue(element: Expr): Value {
   return element;
 }
 
+function normalizeObjectKey(key: Value, opName: string): string {
+  if (isString(key)) return key;
+  if (isKeyword(key)) return key.kw;
+  throw new SSpecError(`${opName} key must be a string or keyword`);
+}
+
+function objectKeysFromValue(keysValue: Value, opName: string): string[] {
+  const keys: string[] = [];
+  const pushKey = (key: Value) => {
+    keys.push(normalizeObjectKey(key, opName));
+  };
+
+  if (isNil(keysValue)) {
+    return keys;
+  }
+
+  if (isArray(keysValue)) {
+    for (const element of keysValue.arr) {
+      pushKey(arrayElementToValue(element));
+    }
+    return keys;
+  }
+
+  let current: Value | null = keysValue;
+  while (current !== null) {
+    if (isCons(current)) {
+      pushKey(current.car);
+      current = current.cdr;
+      continue;
+    }
+    if (isSequenceView(current)) {
+      pushKey(current.first());
+      current = current.rest();
+      continue;
+    }
+    throw new SSpecError(
+      `${opName} requires keys as a list, sequence, array, or null`
+    );
+  }
+
+  return keys;
+}
+
 function toSExpr(expr: Expr | Value): string {
   if (expr == null) {
     return "null";
@@ -1280,6 +1323,79 @@ const builtins: Record<string, BuiltinFunction> = {
       ? null
       : new ObjectSeqView(obj, keyStrings, "entries");
   }),
+  "has?": new BuiltinFunction((args, env) => {
+    if (args.length !== 2) throw new SSpecError("has? requires 2 arguments");
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("has? requires an object as first argument");
+    }
+    const keyStr = normalizeObjectKey(args[1], "has?");
+    return Object.prototype.hasOwnProperty.call(obj, keyStr);
+  }),
+  assoc: new BuiltinFunction((args, env) => {
+    if (args.length < 3) {
+      throw new SSpecError("assoc requires at least 3 arguments");
+    }
+    if ((args.length - 1) % 2 !== 0) {
+      throw new SSpecError("assoc requires key-value pairs");
+    }
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("assoc requires an object as first argument");
+    }
+
+    const result: ObjectValue = { ...obj };
+    for (let i = 1; i < args.length; i += 2) {
+      const keyStr = normalizeObjectKey(args[i], "assoc");
+      result[keyStr] = args[i + 1];
+    }
+    return result;
+  }),
+  dissoc: new BuiltinFunction((args, env) => {
+    if (args.length < 1) {
+      throw new SSpecError("dissoc requires at least 1 argument");
+    }
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("dissoc requires an object as first argument");
+    }
+
+    const result: ObjectValue = { ...obj };
+    for (let i = 1; i < args.length; i++) {
+      const keyStr = normalizeObjectKey(args[i], "dissoc");
+      delete result[keyStr];
+    }
+    return result;
+  }),
+  merge: new BuiltinFunction((args, env) => {
+    const result: ObjectValue = {};
+    for (const obj of args) {
+      if (!isPlainObject(obj)) {
+        throw new SSpecError("merge requires object arguments");
+      }
+      Object.assign(result, obj);
+    }
+    return result;
+  }),
+  "select-keys": new BuiltinFunction((args, env) => {
+    if (args.length !== 2) {
+      throw new SSpecError("select-keys requires 2 arguments");
+    }
+    const obj = args[0];
+    if (!isPlainObject(obj)) {
+      throw new SSpecError("select-keys requires an object as first argument");
+    }
+    const objValue: ObjectValue = obj;
+
+    const keyStrings = objectKeysFromValue(args[1], "select-keys");
+    const result: ObjectValue = {};
+    for (const key of keyStrings) {
+      if (Object.prototype.hasOwnProperty.call(objValue, key)) {
+        result[key] = objValue[key];
+      }
+    }
+    return result;
+  }),
   get: new BuiltinFunction((args, env) => {
     if (args.length < 2 || args.length > 3) {
       throw new SSpecError("get requires 2 or 3 arguments");
@@ -1292,14 +1408,7 @@ const builtins: Record<string, BuiltinFunction> = {
       throw new SSpecError("get requires an object as first argument");
     }
 
-    let keyStr: string;
-    if (isString(key)) {
-      keyStr = key;
-    } else if (isKeyword(key)) {
-      keyStr = key.kw;
-    } else {
-      throw new SSpecError("get key must be a string or keyword");
-    }
+    const keyStr = normalizeObjectKey(key, "get");
 
     // Type guard ensures obj is ObjectValue here
     const objValue: ObjectValue = obj;

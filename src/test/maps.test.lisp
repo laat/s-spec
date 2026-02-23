@@ -105,6 +105,48 @@
   (assert/throws (fn [] (vals 42)) "vals requires an object")
   (assert/throws (fn [] (entries 42)) "entries requires an object"))
 
+(test "has? - key presence"
+  (assert/equal (has? {:a 1 :b null} :a) true)
+  (assert/equal (has? {:a 1 :b null} :b) true)
+  (assert/equal (has? {:a 1 :b null} :c) false)
+  (assert/equal (has? {"x" 1} "x") true))
+
+(test "assoc - set and overwrite"
+  (def m {:a 1})
+  (def m2 (assoc m :b 2 :a 3))
+  (assert/equal (= m {:a 1}) true)
+  (assert/equal (= m2 {:a 3 :b 2}) true))
+
+(test "dissoc - remove keys immutably"
+  (def m {:a 1 :b 2 :c 3})
+  (def m2 (dissoc m :a :missing))
+  (assert/equal (= m {:a 1 :b 2 :c 3}) true)
+  (assert/equal (= m2 {:b 2 :c 3}) true))
+
+(test "merge - shallow object merge"
+  (assert/equal (= (merge {:a 1} {:b 2} {:a 9}) {:a 9 :b 2}) true)
+  (assert/equal (= (merge) {}) true)
+  (assert/equal (= (merge {:nested {:a 1}} {:nested {:b 2}})
+                   {:nested {:b 2}}) true))
+
+(test "select-keys - project object"
+  (assert/equal (= (select-keys {:a 1 :b 2 :c 3} (list :a :c :x))
+                   {:a 1 :c 3}) true)
+  (assert/equal (= (select-keys {"a" 1 "b" 2} ["a"]) {"a" 1}) true)
+  (assert/equal (= (select-keys {:a 1 :b 2} (keys {:b 0})) {:b 2}) true))
+
+(test "map helpers - type and arity errors"
+  (assert/throws (fn [] (has? 42 :a)) "has? requires an object as first argument")
+  (assert/throws (fn [] (has? {} 42)) "has? key must be a string or keyword")
+  (assert/throws (fn [] (assoc {} :a)) "assoc requires at least 3 arguments")
+  (assert/throws (fn [] (assoc {} :a 1 :b)) "assoc requires key-value pairs")
+  (assert/throws (fn [] (assoc {} 1 2)) "assoc key must be a string or keyword")
+  (assert/throws (fn [] (dissoc 42 :a)) "dissoc requires an object as first argument")
+  (assert/throws (fn [] (dissoc {} 1)) "dissoc key must be a string or keyword")
+  (assert/throws (fn [] (merge {:a 1} 42)) "merge requires object arguments")
+  (assert/throws (fn [] (select-keys 42 (list :a))) "select-keys requires an object as first argument")
+  (assert/throws (fn [] (select-keys {} 42)) "select-keys requires keys as a list, sequence, array, or null"))
+
 (test "maps with commas"
   (assert/equal (= {:name "John", :age 30} {:name "John" :age 30}) true)
   (assert/equal (= {:a 1, :b 2, :c 3} {:a 1 :b 2 :c 3}) true)
