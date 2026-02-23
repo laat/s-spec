@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.build.json && cp src/stdlib.lisp dist/stdlib.lisp && cp src/stdlib-test.lisp dist/stdlib-test.lisp",
     "test": "tsc && node --experimental-strip-types --test src/**/*.test.ts",
     "dev": "tsc --watch -p tsconfig.build.json",
-    "repl": "node --experimental-strip-types src/repl.ts"
+    "repl": "node --experimental-strip-types src/cli.ts"
   },
   "keywords": [
     "validation",

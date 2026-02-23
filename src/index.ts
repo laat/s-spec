@@ -1833,25 +1833,3 @@ export {
   isCallable,
   builtins,
 };
-
-// CLI
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const input = process.argv[2];
-  if (!input) {
-    console.error('Usage: node index.js "<expr>"');
-    process.exit(1);
-  }
-  try {
-    const result = evaluate(input);
-    if (result !== null) {
-      if (isCallable(result)) {
-        console.log("<function>");
-      } else {
-        console.log(result);
-      }
-    }
-  } catch (e) {
-    console.error((e as Error).message);
-    process.exit(1);
-  }
-}

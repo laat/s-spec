@@ -1,5 +1,7 @@
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   lex,
   parse,
@@ -10,6 +12,7 @@ import {
   Environment,
   SSpecError,
   isCallable,
+  evaluate,
 } from "./index.ts";
 
 const VERSION = "0.0.1";
@@ -60,6 +63,56 @@ function isBalanced(input: string): boolean {
 }
 
 /**
+ * Recursively format a value for display, handling s-spec types
+ */
+function formatValueRecursive(value: any): string {
+  // null/undefined
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+
+  // Functions
+  if (isCallable(value)) {
+    return "<function>";
+  }
+
+  // AST nodes (keywords, symbols, cons cells, etc.)
+  if (typeof value === "object" && "type" in value) {
+    if (value.type === "keyword") {
+      return `:${value.kw}`;
+    }
+    if (value.type === "symbol") {
+      return value.sym;
+    }
+    // For other AST nodes (cons cells, etc), use toSExpr
+    return toSExpr(value);
+  }
+
+  // Primitives
+  if (typeof value === "string") {
+    return `"${value}"`;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  // Arrays
+  if (Array.isArray(value)) {
+    const elements = value.map(formatValueRecursive);
+    return `[${elements.join(", ")}]`;
+  }
+
+  // Plain objects
+  if (typeof value === "object") {
+    const entries = Object.entries(value).map(
+      ([key, val]) => `"${key}": ${formatValueRecursive(val)}`
+    );
+    return `{${entries.join(", ")}}`;
+  }
+
+  return String(value);
+}
+
+/**
  * Format a value for display in the REPL
  */
 function formatValue(value: any): string {
@@ -67,24 +120,7 @@ function formatValue(value: any): string {
     return ""; // Don't print null
   }
 
-  if (isCallable(value)) {
-    return "<function>";
-  }
-
-  if (typeof value === "object" && "type" in value) {
-    // It's an AST node
-    return toSExpr(value);
-  }
-
-  if (typeof value === "string") {
-    return `"${value}"`;
-  }
-
-  if (typeof value === "object") {
-    return JSON.stringify(value, null, 2);
-  }
-
-  return String(value);
+  return formatValueRecursive(value);
 }
 
 /**
@@ -225,11 +261,64 @@ async function startRepl(): Promise<void> {
 }
 
 /**
- * Entry point
+ * Execute a .lisp file
+ */
+function executeFile(filePath: string): void {
+  try {
+    const resolvedPath = resolve(filePath);
+    const code = readFileSync(resolvedPath, "utf-8");
+    const env = createEnv();
+    const tokens = lex(code);
+    const exprs = parse(tokens);
+
+    for (const expr of exprs) {
+      const expanded = macroExpand(expr, env);
+      const result = evalExpr(expanded, env);
+      // Don't print intermediate results when executing files
+    }
+  } catch (e) {
+    if (e instanceof SSpecError) {
+      console.error(`Error: ${e.message}`);
+    } else {
+      console.error(`Error: ${(e as Error).message}`);
+    }
+    process.exit(1);
+  }
+}
+
+/**
+ * Evaluate a single expression
+ */
+function evaluateExpression(expr: string): void {
+  try {
+    const result = evaluate(expr);
+    const formatted = formatValue(result);
+    if (formatted) {
+      console.log(formatted);
+    }
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Entry point - handles REPL, file execution, and expression evaluation
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  startRepl().catch((e) => {
-    console.error("REPL error:", e);
-    process.exit(1);
-  });
+  const arg = process.argv[2];
+
+  if (!arg) {
+    // No arguments: start REPL
+    startRepl().catch((e) => {
+      console.error("REPL error:", e);
+      process.exit(1);
+    });
+  } else if (arg.endsWith(".lisp")) {
+    // File argument: execute file
+    executeFile(arg);
+  } else {
+    // Expression argument: evaluate expression
+    evaluateExpression(arg);
+  }
 }
