@@ -1,0 +1,31 @@
+(test "mixed-type equality matrix"
+  (assert/equal (= 0 false) false)
+  (assert/equal (= 0 "0") false)
+  (assert/equal (= 1 "1") false)
+  (assert/equal (= true 1) false)
+  (assert/equal (= false 0) false)
+  (assert/equal (= null false) false)
+  (assert/equal (= null "") false)
+  (assert/equal (= nil false) false)
+  (assert/equal (= nil "") false)
+  (assert/equal (= nil []) false)
+  (assert/equal (= nil {}) false)
+  (assert/equal (= [] {}) false)
+  (assert/equal (= [] "") false)
+  (assert/equal (= {} "") false)
+  (assert/equal (= :a "a") false)
+  (assert/equal (= :"a b" "a b") false))
+
+(test "same-shape different-type containers are not equal"
+  (assert/equal (= [1 2] (list 1 2)) false)
+  (assert/equal (= {:a 1} [[:a 1]]) false)
+  (assert/equal (= (list) []) false)
+  (assert/equal (= (list) nil) true)
+  (assert/equal (= [] (array)) true))
+
+(test "mixed-type not-equals mirrors equals"
+  (assert/equal (/= 0 false) true)
+  (assert/equal (/= nil []) true)
+  (assert/equal (/= [1 2] (list 1 2)) true)
+  (assert/equal (/= :a "a") true)
+  (assert/equal (/= [] (array)) false))
