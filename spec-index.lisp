@@ -25,8 +25,8 @@
    ["parser-basic.lisp"
     "parser-errors.lisp"
     "reader-comments-basic.lisp"
-    "reader-macros-basic.lisp"
-    "reader-macros-errors.lisp"]
+    "reader-syntax-basic.lisp"
+    "reader-syntax-errors.lisp"]
 
    :quote-macro
    ["quote-basic.lisp"

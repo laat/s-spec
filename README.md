@@ -45,7 +45,9 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 | `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. |
 | `require` | `(require "path")` | Like load, but cached. |
 
-### Reader Syntax
+### Reader Syntax (shorthands)
+
+Built-in shorthands that expand during reading. These are not user-definable.
 
 | Syntax | Expansion |
 |--------|-----------|
