@@ -1,4 +1,5 @@
 (test "macro style: bind expression once"
+  (require "stdlib.lisp")
   (defmacro when-some [expr then else]
     (let [v (gensym "value")]
       (quasiquote
@@ -10,6 +11,7 @@
   (assert/equal (when-some (:email {:name "Ada"}) "yes" "no") "no"))
 
 (test "macro style: use gensym for introduced locals"
+  (require "stdlib.lisp")
   (defmacro or-else [a b]
     (let [g (gensym "or")]
       (quasiquote

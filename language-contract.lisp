@@ -8,6 +8,7 @@
   (assert/equal (if {} :then :else) :then))
 
 (test "function arguments evaluate left to right"
+  (require "stdlib.lisp")
   (def counter 0)
   (def tick
     (fn []
@@ -22,6 +23,7 @@
   (assert/equal global-value 2))
 
 (test "let bindings evaluate sequentially"
+  (require "stdlib.lisp")
   (assert/equal
     (let [x 1
           y (+ x 1)

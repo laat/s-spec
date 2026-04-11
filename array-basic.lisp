@@ -18,11 +18,11 @@
   (assert/equal (get [10 20 30] 1) 20)
   (assert/equal (get [10 20 30] 2) 30))
 
-(test "array get out of bounds returns null"
-  (assert/equal (get [] 0) null)
-  (assert/equal (get [10 20 30] -1) null)
-  (assert/equal (get [10 20 30] 3) null)
-  (assert/equal (get [10 20 30] 99) null))
+(test "array get out of bounds returns nil"
+  (assert/equal (get [] 0) nil)
+  (assert/equal (get [10 20 30] -1) nil)
+  (assert/equal (get [10 20 30] 3) nil)
+  (assert/equal (get [10 20 30] 99) nil))
 
 (test "nested arrays"
   (assert/equal (get [1 [2 3] 4] 1) [2 3])

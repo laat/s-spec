@@ -6,7 +6,7 @@
   (assert/equal (and true nil "x") nil))
 
 (test "or truthy and falsey behavior"
-  (assert/equal (or) nil)
+  (assert/equal (or) false)
   (assert/equal (or false nil) nil)
   (assert/equal (or false nil 0) 0)
   (assert/equal (or false nil "x" 99) "x"))

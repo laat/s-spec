@@ -7,6 +7,7 @@
   (assert/equal (do "a" "b") "b"))
 
 (test "do evaluates forms in order"
+  (require "stdlib.lisp")
   (def do-counter 0)
   (def bump
     (fn []

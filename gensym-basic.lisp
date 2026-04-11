@@ -14,6 +14,7 @@
   (assert/throws (fn [] (gensym "a" "b")) "gensym requires zero or one argument"))
 
 (test "gensym helps avoid macro capture"
+  (require "stdlib.lisp")
   (defmacro first-or-safe [a b]
     (let [g (gensym)]
       (quasiquote (let [(unquote g) (unquote a)]

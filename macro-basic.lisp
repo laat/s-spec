@@ -15,6 +15,7 @@
   (assert/equal (print (literal-form {:a 1 :b [2 3]})) "{:a 1 :b [2 3]}"))
 
 (test "non-hygienic macro can capture names"
+  (require "stdlib.lisp")
   (defmacro with-tmp [value body]
     (quasiquote (let [tmp (unquote value)]
                  (unquote body))))

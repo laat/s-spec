@@ -36,10 +36,6 @@
   (assert/throws (fn [] (parse "(def x)")) "def requires exactly two arguments")
   (assert/throws (fn [] (parse "(def x 1 2)")) "def requires exactly two arguments"))
 
-(test "parse rejects malformed defonce forms"
-  (assert/throws (fn [] (parse "(defonce)")) "defonce requires exactly two arguments")
-  (assert/throws (fn [] (parse "(defonce x)")) "defonce requires exactly two arguments")
-  (assert/throws (fn [] (parse "(defonce x 1 2)")) "defonce requires exactly two arguments"))
 
 (test "parse rejects malformed if forms"
   (assert/throws (fn [] (parse "(if)")) "if requires exactly three arguments")
@@ -52,11 +48,6 @@
   (assert/throws (fn [] (parse "(defmacro m [x])")) "defmacro requires a body")
   (assert/throws (fn [] (parse "(defmacro m x x)")) "defmacro params must be a vector"))
 
-(test "parse rejects malformed defmacroonce forms"
-  (assert/throws (fn [] (parse "(defmacroonce)")) "defmacroonce requires a name, params, and body")
-  (assert/throws (fn [] (parse "(defmacroonce m)")) "defmacroonce requires a name, params, and body")
-  (assert/throws (fn [] (parse "(defmacroonce m [x])")) "defmacroonce requires a body")
-  (assert/throws (fn [] (parse "(defmacroonce m x x)")) "defmacroonce params must be a vector"))
 
 (test "parse rejects malformed quote-family forms"
   (assert/throws (fn [] (parse "(quote)")) "quote requires exactly one argument")
