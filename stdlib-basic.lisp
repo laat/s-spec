@@ -42,3 +42,24 @@
   (assert/equal (doc when) "Evaluate then when pred is truthy.")
   (assert/equal (doc let) "Sequential local bindings with arbitrary length and multi-form bodies.")
   (assert/equal (doc defn) "Define a named function; expands to def + fn."))
+
+(test "cond walks pred/body pairs top-to-bottom"
+  (require "stdlib.lisp")
+  (assert/equal (cond) nil)
+  (assert/equal (cond true 1) 1)
+  (assert/equal (cond false 1) nil)
+  (assert/equal (cond false 1 true 2) 2)
+  (assert/equal (cond false 1 false 2 :else 3) 3)
+  (assert/equal (cond false 1 false 2 false 3) nil))
+
+(test "cond short-circuits — only the first truthy branch evaluates"
+  (require "stdlib.lisp")
+  (def cond-counter 0)
+  (defn cond-bump [] (def cond-counter (+ cond-counter 1)) cond-counter)
+  (cond true (cond-bump) :else (cond-bump))
+  (assert/equal cond-counter 1))
+
+(test "cond with odd number of clauses throws"
+  (require "stdlib.lisp")
+  (assert/throws (fn [] (cond true)) "cond requires an even number of clauses")
+  (assert/throws (fn [] (cond true 1 false)) "cond requires an even number of clauses"))

@@ -106,3 +106,26 @@
     (def (unquote name)
       (fn (unquote params)
         (splice-unquote body)))))
+
+(defonce cond/even?
+  (fn [clauses]
+    (if (nil? clauses)
+      true
+      (if (nil? (rest clauses))
+        false
+        (cond/even? (rest (rest clauses)))))))
+
+(defonce cond/expand
+  (fn [clauses]
+    (if (nil? clauses)
+      nil
+      (quasiquote
+        (if (unquote (first clauses))
+          (unquote (first (rest clauses)))
+          (unquote (cond/expand (rest (rest clauses)))))))))
+
+(defmacroonce cond [& clauses]
+  "Walk pred/body pairs top-to-bottom; return body of first truthy pred, else nil. Use :else as the catch-all predicate."
+  (if (cond/even? clauses)
+    (cond/expand clauses)
+    (error "cond requires an even number of clauses")))
