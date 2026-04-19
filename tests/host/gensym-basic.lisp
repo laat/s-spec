@@ -1,3 +1,6 @@
+(test "gensym docstring"
+  (assert/equal (doc gensym) "Unique symbol."))
+
 (test "gensym returns a symbol"
   (assert/equal (symbol? (gensym)) true)
   (assert/equal (symbol? (gensym "tmp")) true))

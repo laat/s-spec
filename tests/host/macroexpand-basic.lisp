@@ -1,3 +1,7 @@
+(test "macroexpand docstrings"
+  (assert/equal (doc macroexpand-1) "Expand the form once at the head, if it is a macro call.")
+  (assert/equal (doc macroexpand) "Repeatedly macroexpand at the head until a fixpoint."))
+
 (test "macroexpand-1 expands one step"
   (defmacro inc1 [x]
     (quasiquote (+ (unquote x) 1)))

@@ -21,3 +21,8 @@
   (assert/equal
     (print (parse "`(x ~y ~@zs)"))
     (print (parse "(quasiquote (x (unquote y) (splice-unquote zs)))"))))
+
+(test "quasiquote unquote and splice-unquote shorthands skip comments"
+  (assert/equal
+    (print (parse "` ; qq\n(a ~ ; uq\n b ~@ ; sp\n cs)"))
+    "(quasiquote (a (unquote b) (splice-unquote cs)))"))
