@@ -30,3 +30,9 @@
   (assert/throws (fn [] (quasiquote (unquote a b))) "unquote requires exactly one argument")
   (assert/throws (fn [] (quasiquote ((splice-unquote)))) "splice-unquote requires exactly one argument")
   (assert/throws (fn [] (quasiquote ((splice-unquote a b)))) "splice-unquote requires exactly one argument"))
+
+(test "quasiquote-context check precedes arity check"
+  (assert/throws (fn [] (unquote)) "unquote outside quasiquote")
+  (assert/throws (fn [] (unquote a b)) "unquote outside quasiquote")
+  (assert/throws (fn [] (splice-unquote)) "splice-unquote outside quasiquote")
+  (assert/throws (fn [] (splice-unquote a b)) "splice-unquote outside quasiquote"))

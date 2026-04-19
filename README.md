@@ -70,6 +70,8 @@ All semantic validation happens at eval time:
 - Object key type validation (must be keywords)
 - `unquote` / `splice-unquote` quasiquote context requirement
 
+`unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
+
 The `parse` builtin exposes the reader directly — it returns a form without semantic validation.
 
 ### Builtins
