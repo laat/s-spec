@@ -12,3 +12,14 @@
 
 (test "require surfaces parser errors from loaded file"
   (assert/throws (fn [] (require "fixtures/require/invalid-syntax.lisp")) "unexpected end of input"))
+
+(test "require does not cache failed loads — side effects run each time"
+  (def require_fail_count 0)
+  (assert/throws (fn [] (require "fixtures/require/throws.lisp")) "boom")
+  (assert/equal require_fail_count 1)
+  (assert/throws (fn [] (require "fixtures/require/throws.lisp")) "boom")
+  (assert/equal require_fail_count 2))
+
+(test "require does not cache parser failures"
+  (assert/throws (fn [] (require "fixtures/require/invalid-syntax.lisp")) "unexpected end of input")
+  (assert/throws (fn [] (require "fixtures/require/invalid-syntax.lisp")) "unexpected end of input"))

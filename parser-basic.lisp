@@ -59,6 +59,12 @@
   (assert/equal (print (parse "{\"a\" 1}")) "{\"a\" 1}")
   (assert/equal (print (parse "{1 2}")) "{1 2}"))
 
+(test "parsed object-literal form equals runtime Object when keys are keywords"
+  (assert/equal (= (parse "{:a 1}") {:a 1}) true)
+  (assert/equal (= (parse "{:a 1 :b 2}") {:a 1 :b 2}) true)
+  (assert/equal (= (parse "{}") {}) true)
+  (assert/equal (= (parse "{:a [1 2]}") {:a [1 2]}) true))
+
 (test "print keyword with simple name uses unquoted form"
   (assert/equal (print :foo) ":foo")
   (assert/equal (print :cfg/port) ":cfg/port")

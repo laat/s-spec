@@ -51,8 +51,8 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 | `quote` | `(quote form)` | Return form unevaluated. |
 | `quasiquote` | `(quasiquote form)` | Template. `unquote` evaluates, `splice-unquote` splices. |
 | `defmacro` | `(defmacro name [params] body...)` | Define macro. Supports `& rest` and docstrings. The name is bound in both the macro table (for call-site expansion) and the variable namespace (for `bound?`, `doc`, and symbol lookup); `(doc name)` returns the macro's docstring and `(bound? (quote name))` returns `true`. **Special-form names always win**: shadowing a special form (e.g. `(defmacro if [...] ...)`) installs the macro but the special form continues to dispatch — the macro is effectively unreachable by name. Hosts MUST dispatch special forms before consulting the macro table. |
-| `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. |
-| `require` | `(require "path")` | Like `load`, but cached by resolved absolute path — requiring the same file from different call sites or via different relative paths evaluates it only once. |
+| `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. Always returns `nil` — use the file's own `def`s to expose values. |
+| `require` | `(require "path")` | Like `load`, but cached by resolved absolute path — requiring the same file from different call sites or via different relative paths evaluates it only once. **Always returns `nil`**, whether the file was just evaluated or served from cache; use `require` for side effects (installing bindings, macros) and the loaded file's own `def`s to expose values. **Failed loads are not cached**: if evaluating the file throws (parser error, runtime error, any error), the cache is not populated and a subsequent `require` of the same path re-reads and re-evaluates the file from scratch. |
 
 ### Tail Calls
 
@@ -61,7 +61,6 @@ Calls in tail position MUST NOT grow the host call stack. This allows recursion-
 - the last form in a `do`, `fn`, or `defmacro` body
 - both branches of an `if`
 - the last form in `and` / `or` (the one whose value is returned)
-- the body of `load` / `require` (the last form of the loaded file)
 - any derived form that expands to the above (e.g. `let`, `when`, `defn`)
 
 Hosts typically implement this as a trampoline or loop in the evaluator.
@@ -116,7 +115,7 @@ Examples:
 
 ### Validation Model
 
-The reader is a pure source-to-form converter. Its output is ordinary s-spec data — lists, arrays, atoms — with **one exception**: because object keys are validated at eval/quote time (not at read time), the reader's result for `{…}` is an unvalidated *object-literal form* that may hold any shape of key. `(parse "{\"a\" 1}")` must succeed, even though eval and quote will later throw `"object keys must be keywords"`. Hosts may represent this as a distinct internal form or as an Object that permits any key — the externally observable requirement is only that `parse` succeeds on syntactically well-formed `{…}` regardless of key types, and that every eval and quote path turns it into a runtime Object with keyword-only keys. The printer prints object-literal forms the same as runtime Objects.
+The reader is a pure source-to-form converter. Its output is ordinary s-spec data — lists, arrays, atoms — with **one exception**: because object keys are validated at eval/quote time (not at read time), the reader's result for `{…}` is an unvalidated *object-literal form* that may hold any shape of key. `(parse "{\"a\" 1}")` must succeed, even though eval and quote will later throw `"object keys must be keywords"`. Hosts may represent this as a distinct internal form or as an Object that permits any key — the externally observable requirements are: (1) `parse` succeeds on syntactically well-formed `{…}` regardless of key types, (2) every eval and quote path turns it into a runtime Object with keyword-only keys, (3) the printer prints object-literal forms the same as runtime Objects, and (4) when an object-literal form happens to have keyword-only keys, it compares `=` to the runtime Object with the same keys and values — so `(= (parse "{:a 1}") {:a 1})` is `true`.
 
 The reader handles:
 - Tokenization (numbers, strings, symbols, keywords, booleans, `nil`, `null`). Whitespace separates tokens; comma (`,`) is whitespace.
