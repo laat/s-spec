@@ -2,9 +2,24 @@
 
 A minimal, embeddable Lisp for validating and conforming JSON values.
 
-## Implementor's Reference
+## Three-Tier Design
 
-This section lists everything a host language must implement. The stdlib (`stdlib.lisp`) builds everything else from these primitives.
+s-spec is layered:
+
+1. **User-space** (this document) — the language validation authors write. Small: values, a handful of special forms, the builtins table, and the stdlib bindings delivered below. **No macro or module surface.** `defmacro`, `quasiquote`, `load`, `require`, etc. are not available to user code.
+2. **Host-impl tier** ([HOST.md](./HOST.md)) — a superset of user-space used to author `stdlib.lisp`. Adds `defmacro` / `quasiquote` / `unquote` / `splice-unquote`, `load` / `require`, `gensym`, `macroexpand` / `macroexpand-1`, and the additional stdlib forms `defonce` / `defmacroonce`.
+3. **Test harness** — overlay forms (`(test …)`, `assert/equal`, `assert/throws`) available only under a test runner. See *Test Harness* below. Runs on top of user-space (`tests/user/`) or host-impl (`tests/host/`).
+
+Two valid paths to implement user-space:
+
+- **Path A (preloaded stdlib)** — implement the host-impl tier and run `stdlib.lisp` at startup to populate the user-space environment with the stdlib bindings.
+- **Path B (native forms)** — skip host-impl; implement each stdlib binding natively as a special form or builtin, matching the reference semantics of `stdlib.lisp` (tested under `tests/host/`).
+
+`stdlib.lisp` is the reference implementation. Path A hosts run it; Path B hosts must match its behavior.
+
+## User-Space Reference
+
+This section lists everything a host must expose to user-space code. Macro- and module-related forms live in HOST.md.
 
 ### Types
 
@@ -21,7 +36,7 @@ This section lists everything a host language must implement. The stdlib (`stdli
 | array | `[1 2 3]` — ordered, zero-indexed |
 | object | `{:key val}` — keyword keys, insertion-order |
 | function | `(fn [params] body...)` — closure |
-| macro | `(defmacro name [params] body...)` — receives unevaluated forms |
+| macro | Receives unevaluated forms. Visible in user-space as stdlib bindings (e.g. `let`, `when`); defined in the host-impl tier — see HOST.md. |
 
 ### Truthiness
 
@@ -31,10 +46,9 @@ Only `false` and `nil` are falsey. Everything else is truthy — including `null
 
 s-spec is a **Lisp-1**: functions, macros, and values share a single variable namespace. A symbol resolves the same way in operator position (head of a call) as in value position.
 
-- `(def x 1)` followed by `(defmacro x [y] ...)` replaces `x` — the later binding wins.
+- `(def x 1)` followed by a later binding for `x` replaces it — the later binding wins.
 - `(bound? (quote name))` is `true` for any binding — var, function, or macro.
-- `defmacroonce` no-ops if the name is already bound **by anything** (var or macro). This is the standard Lisp-1 interpretation of "already bound".
-- Special-form names (`if`, `def`, `fn`, `quote`, …) are not in the namespace at all; they dispatch before name lookup. See the `defmacro` row below.
+- Special-form names (`if`, `def`, `fn`, `quote`, …) are not in the namespace at all; they dispatch before name lookup.
 
 ### Special Forms
 
@@ -49,16 +63,12 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 | `and` | `(and forms...)` | Short-circuit. Returns first falsey or last value. `(and)` → `true`. |
 | `or` | `(or forms...)` | Short-circuit. Returns first truthy or last value. `(or)` → `false`. |
 | `quote` | `(quote form)` | Return form unevaluated. |
-| `quasiquote` | `(quasiquote form)` | Template. `unquote` evaluates, `splice-unquote` splices. |
-| `defmacro` | `(defmacro name [params] body...)` | Define macro. Supports `& rest` and docstrings. The name is bound in both the macro table (for call-site expansion) and the variable namespace (for `bound?`, `doc`, and symbol lookup); `(doc name)` returns the macro's docstring and `(bound? (quote name))` returns `true`. **Special-form names always win**: shadowing a special form (e.g. `(defmacro if [...] ...)`) installs the macro but the special form continues to dispatch — the macro is effectively unreachable by name. Hosts MUST dispatch special forms before consulting the macro table. |
-| `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. Always returns `nil` — use the file's own `def`s to expose values. |
-| `require` | `(require "path")` | Like `load`, but cached by resolved absolute path — requiring the same file from different call sites or via different relative paths evaluates it only once. **Always returns `nil`**, whether the file was just evaluated or served from cache; use `require` for side effects (installing bindings, macros) and the loaded file's own `def`s to expose values. **Failed loads are not cached**: if evaluating the file throws (parser error, runtime error, any error), the cache is not populated and a subsequent `require` of the same path re-reads and re-evaluates the file from scratch. |
 
 ### Tail Calls
 
 Calls in tail position MUST NOT grow the host call stack. This allows recursion-based looping without stack overflow. Tail positions are:
 
-- the last form in a `do`, `fn`, or `defmacro` body
+- the last form in a `do` or `fn` body
 - both branches of an `if`
 - the last form in `and` / `or` (the one whose value is returned)
 - any derived form that expands to the above (e.g. `let`, `when`, `defn`)
@@ -67,15 +77,14 @@ Hosts typically implement this as a trampoline or loop in the evaluator.
 
 ### Reader Syntax (shorthands)
 
-Built-in shorthands that expand during reading. These are not user-definable.
+Built-in shorthands that expand during reading.
 
 | Syntax | Expansion |
 |--------|-----------|
 | `'x` | `(quote x)` |
-| `` `x `` | `(quasiquote x)` |
-| `~x` | `(unquote x)` |
-| `~@x` | `(splice-unquote x)` |
 | `;` | Comment to end of line |
+
+The host-impl tier adds `` ` ``, `~`, and `~@` — see HOST.md.
 
 ### Number Grammar
 
@@ -120,13 +129,12 @@ The reader is a pure source-to-form converter. Its output is ordinary s-spec dat
 The reader handles:
 - Tokenization (numbers, strings, symbols, keywords, booleans, `nil`, `null`). Whitespace separates tokens; comma (`,`) is whitespace.
 - Delimiter matching (`(` `)`, `[` `]`, `{` `}`)
-- Reader shorthand expansion (`'x` → `(quote x)`, etc.)
+- Reader shorthand expansion (`'x` → `(quote x)`)
 - Object literal structure (even number of forms)
 
 All semantic validation happens at eval time:
-- Special-form arity and argument types (`def`, `fn`, `if`, `defmacro`, `quote`, `quasiquote`)
+- Special-form arity and argument types (`def`, `fn`, `if`, `quote`)
 - Object key type validation (must be keywords)
-- `unquote` / `splice-unquote` quasiquote context requirement
 
 **Literal-to-constructor equivalence.** The literal forms `[…]` and `{…}` are equivalent to calls to their constructors — they share representation and equality semantics:
 
@@ -142,15 +150,9 @@ Quoted literals evaluate through the same construction path as their literal for
 
 Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps runtime Object a single type whose keys are always keywords; only the short-lived object-literal form produced by `parse` ever holds non-keyword keys.
 
-`unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
-
-Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`. Directly as the `quasiquote` argument with no enclosing container — `` `(splice-unquote xs) `` — there is nothing to splice into, so it throws `"splice-unquote requires an enclosing list or array"`. When the container exists but the spliced value is not a sequence (e.g. `` `(a (splice-unquote 2) b) ``), it throws a distinct `"splice-unquote value must be a list or array"`. `nil` is the empty proper list, so splicing `nil` into a list or array contributes zero elements (no error).
-
-`unquote` **is** allowed in object key position: `` `{(unquote k) 1} `` evaluates `k` and uses its value as the key. The same key-type rule applies — the value `k` evaluates to must be a keyword, otherwise `"object keys must be keywords"` is thrown. Unlike the splice-unquote key-position rule (which is a structural constraint), this is just the ordinary key-type check applied to the computed key.
-
-All of the above — splicing, key-position rejection, no-container rejection — apply only at **depth 1** (the enclosing `quasiquote` currently being expanded). Each nested `quasiquote` increments depth; each `unquote` / `splice-unquote` decrements it. At depth > 1 the forms are preserved as literal data for the inner `quasiquote` to handle, and no validation fires. So `` ``{(splice-unquote x) 1} `` expands to the form `` `{(splice-unquote x) 1} `` without raising.
-
 The `parse` builtin exposes the reader directly — it returns a form without semantic validation. Input must contain exactly one form; trailing tokens after the first form throw `"unexpected trailing"` at read time.
+
+Quasiquote / `unquote` / `splice-unquote` semantics are specified in HOST.md.
 
 ### Builtins
 
@@ -180,7 +182,6 @@ Functions bound in the global environment.
 | `json/parse` | `(json/parse str)` | Parse strict JSON into s-spec values (see *JSON Serialization*). |
 | `json/stringify` | `(json/stringify v)` | Serialize to compact JSON (see *JSON Serialization*). |
 | `doc` | `(doc v)` | Get docstring. Accepts functions, macros, and builtins; throws `"doc requires a function, macro, or builtin"` on any other value. Returns `nil` for a function or macro with no docstring; returns the canonical one-line docstring (see *Builtin Docstrings*) for every builtin. |
-| `gensym` | `(gensym [prefix])` | Unique symbol. Output is `<prefix>__<n>` where `<n>` is a monotonically increasing counter starting at `1`. Default prefix is `"G"`, so `(gensym)` produces `G__1`, `G__2`, …. The counter resets between tests (see *Test Harness*). |
 | `error` | `(error msg)` | Throw an error. |
 
 ### Builtin Docstrings
@@ -211,21 +212,18 @@ Functions bound in the global environment.
 | `json/parse` | `Parse strict JSON into an s-spec value.` |
 | `json/stringify` | `Serialize a value to compact JSON.` |
 | `doc` | `Get the docstring of a function, macro, or builtin.` |
-| `gensym` | `Unique symbol.` |
 | `error` | `Throw an error with the given message.` |
 | `bound?` | `True when the given symbol is bound in the caller's env.` |
-| `macroexpand-1` | `Expand the form once at the head, if it is a macro call.` |
-| `macroexpand` | `Repeatedly macroexpand at the head until a fixpoint.` |
 
 ### Caller-Env Forms
 
-These three forms are listed separately from the builtins because they require access to the caller's lexical environment and macro bindings, so they cannot be implemented as ordinary closures. A host may implement them as special forms, or as builtins that receive the caller env as an implicit first argument — but their arguments are evaluated (unlike the special forms above).
+`bound?` is listed separately from the builtins because it requires access to the caller's lexical environment, so it cannot be implemented as an ordinary closure. A host may implement it as a special form, or as a builtin that receives the caller env as an implicit first argument — but its arguments are evaluated (unlike the special forms above).
 
 | Form | Behavior |
 |------|----------|
 | `bound?` | `(bound? 'sym)` — `sym` is evaluated and must be a symbol (otherwise throws `"bound? requires a symbol"`). Walks the caller's lexical env chain. Presence, not truthiness — a binding to `nil` or `false` still returns `true`. |
-| `macroexpand-1` | `(macroexpand-1 form)` — If `form` is a list whose head is a symbol bound to a macro in the caller's env, apply that macro once. Otherwise return `form` unchanged. |
-| `macroexpand` | `(macroexpand form)` — Repeatedly apply `macroexpand-1` at the head until the head is no longer bound to a macro. Termination is decided by head inspection only (not by structural comparison of successive expansions), so a macro that rewrites to a form with the same head symbol halts as soon as that head ceases to name a macro. Does not descend into sub-forms. |
+
+The host-impl tier adds `macroexpand-1` and `macroexpand` here — see HOST.md.
 
 ### Keyword-as-function
 
@@ -288,12 +286,10 @@ Every other value throws `"json/stringify does not support <type>"` where `<type
 
 ### stdlib
 
-The standard library (`stdlib.lisp`) defines these from primitives. Host implementations may inline them as special forms for performance, but semantics must match.
+`stdlib.lisp` defines these. Under Path A they are delivered as preloaded macros/functions; under Path B the host implements them natively. Semantics must match the reference.
 
 | Form | Description |
 |------|-------------|
-| `defonce` | `(defonce name expr)` — bind only if unbound |
-| `defmacroonce` | `(defmacroonce name [params] body...)` — define macro only if unbound |
 | `let` | `(let [bindings...] body...)` — sequential local bindings |
 | `when` | `(when pred then)` |
 | `when-not` | `(when-not pred then)` |
@@ -301,13 +297,16 @@ The standard library (`stdlib.lisp`) defines these from primitives. Host impleme
 | `if-not` | `(if-not pred then else)` |
 | `or-else` | `(or-else a b)` — evaluate `a` once; return if truthy, else `b` |
 | `and-then` | `(and-then a b)` — evaluate `a` once; return `b` if truthy, else `a` |
+| `cond` | `(cond pred body ...)` — walk pred/body pairs top-to-bottom; return body of first truthy pred, else `nil`. Use `:else` as the catch-all. |
 | `defn` | `(defn name [params] body...)` — define named function |
+
+The host-impl tier additionally provides `defonce` and `defmacroonce` — see HOST.md.
 
 ### Error Vocabulary
 
 Every error s-spec raises is matched by substring in the spec tests (see `(assert/throws … "substring")`). Implementations MUST produce an error whose message contains the substring shown here for the listed condition. The exact full text is unspecified — host implementations can prepend paths, line numbers, or context — but the substring must be present literally.
 
-This table is the canonical vocabulary. Do not invent new phrasings for conditions already listed.
+This table is the canonical vocabulary for user-space. Host-impl errors (macros, modules, quasiquote) are listed in HOST.md. Do not invent new phrasings for conditions already listed.
 
 **Reader / parser**
 
@@ -321,7 +320,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | `01`, `1.`, `1.e2`, `1a`, `123abc`, or a literal that overflows float64 (`1e400`) | `invalid number` |
 | Bare `:` or `{: 1}` (no keyword body) | `invalid keyword` |
 | Object literal with an odd number of forms (reader-level check) | `requires an even number of forms` |
-| Reader shorthand with nothing after it | `expected form after quote` / `expected form after quasiquote` / `expected form after unquote` / `expected form after splice-unquote` |
+| Quote reader shorthand with nothing after it | `expected form after quote` |
 
 **Special-form arity and shape**
 
@@ -329,40 +328,19 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 |---|---|
 | `(def)` / `(def x)` / `(def x 1 2)` | `def requires exactly two arguments` |
 | `(def "x" 1)` / `(def :x 1)` / `(def [x] 1)` | `def name must be a symbol` |
-| `(defonce)` / `(defonce x 1 2)` | `defonce requires exactly two arguments` |
-| `(defonce "x" 1)` etc. | `defonce name must be a symbol` |
 | `(if)` / `(if p t)` / `(if p t e extra)` | `if requires exactly three arguments` |
 | `(fn x body)` — params not a vector | `fn params must be a vector` |
 | `(fn [x y])` / `(fn [])` — no body | `fn requires a body` |
-| `(defmacro)` / `(defmacro m)` | `defmacro requires a name, params, and body` |
-| `(defmacro "m" [x] x)` | `defmacro name must be a symbol` |
-| `(defmacro m x x)` | `defmacro params must be a vector` |
-| `(defmacro m [x])` — no body | `defmacro requires a body` |
 | `(fn)` with no arguments | `fn requires params and a body` |
 | `(fn [1] …)` / `(fn [:k] …)` / `(fn ["x"] …)` — non-symbol in params | `fn param names must be symbols` |
 | `(fn [x &] …)` / `(fn [& x y] …)` / `(fn [& &] …)` — `&` misuse | `& must be followed by exactly one rest name` |
-| `(defmacroonce "m" …)` | `defmacroonce name must be a symbol` |
-| `(defmacroonce m x x)` | `defmacroonce params must be a vector` |
-| `(defmacroonce m [x])` | `defmacroonce requires a body` |
 | `(quote)` / `(quote a b)` | `quote requires exactly one argument` |
-| `(quasiquote)` / `(quasiquote a b)` | `quasiquote requires exactly one argument` |
-| `(unquote)` / `(unquote a b)` inside `quasiquote` | `unquote requires exactly one argument` |
-| `(splice-unquote)` / `(splice-unquote a b)` inside `quasiquote` | `splice-unquote requires exactly one argument` |
-| `unquote` / `splice-unquote` outside `quasiquote` (any arity) | `unquote outside quasiquote` / `splice-unquote outside quasiquote` |
-
-**Quasiquote expansion**
-
-| Condition | Substring |
-|---|---|
-| `splice-unquote` at top of `quasiquote` (no enclosing list/array) | `splice-unquote requires an enclosing list or array` |
-| `splice-unquote` whose value is not a list or array | `splice-unquote value must be a list or array` |
-| `splice-unquote` in object key position | `splice-unquote is not valid in object key position` |
 
 **Object construction**
 
 | Condition | Substring |
 |---|---|
-| Non-keyword key in `{…}`, `(object …)`, `(quote {…})`, or computed via `(unquote …)` | `object keys must be keywords` |
+| Non-keyword key in `{…}`, `(object …)`, or `(quote {…})` | `object keys must be keywords` |
 | `(object …)` called with an odd number of arguments | `object arity mismatch` |
 | `(:key …)` applied to any non-object value | `requires an object` |
 | `(:key)` / `(:key obj d extra)` — keyword-as-function with zero or 3+ args | `keyword lookup requires one or two arguments` |
@@ -385,23 +363,6 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Reference to an unbound symbol | `undefined symbol` |
 | `(bound? v)` where `v` is not a symbol | `requires a symbol` |
 | `(doc v)` where `v` is not a function, macro, or builtin | `doc requires a function, macro, or builtin` |
-
-**Utilities**
-
-| Condition | Substring |
-|---|---|
-| `(gensym p)` where `p` is not a string | `gensym prefix must be a string` |
-| `(gensym a b)` — too many args | `gensym requires zero or one argument` |
-| `(macroexpand-1)` / `(macroexpand-1 a b)` | `macroexpand-1 requires exactly one argument` |
-| `(macroexpand)` / `(macroexpand a b)` | `macroexpand requires exactly one argument` |
-
-**Modules**
-
-| Condition | Substring |
-|---|---|
-| `(load v)` / `(require v)` where `v` is not a string | `load requires a string path` / `require requires a string path` |
-| `(load)` / `(load a b)` / `(require)` / `(require a b)` — wrong arity | `load requires exactly one argument` / `require requires exactly one argument` |
-| Target file does not exist | `file not found` |
 
 **JSON**
 
@@ -430,15 +391,20 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 
 ### Test Harness
 
-The spec is tested via `.lisp` files using these forms (implemented as special forms in the test runner):
+The spec is tested via `.lisp` files using these forms (overlay, available only under a test runner):
 
 - `(test "name" body...)` — isolated test block
 - `(assert/equal actual expected)` — deep equality assertion
 - `(assert/throws (fn [] expr) "substring")` — error assertion
 
-File structure: a test file is a sequence of top-level forms. Forms that are `(test …)` blocks are collected as tests; anything else is a **file prelude** (e.g. `(require "stdlib.lisp")`, `(def shared-helper …)`, `(defn helper […] …)`).
+Test files live in two folders:
+
+- `tests/user/` — run against user-space (stdlib bindings are preloaded; no `load`/`require` available)
+- `tests/host/` — run against the host-impl tier (full macro/module surface)
+
+File structure: a test file is a sequence of top-level forms. Forms that are `(test …)` blocks are collected as tests; anything else is a **file prelude** (e.g. `(def shared-helper …)`, and — in host tests only — `(require "stdlib.lisp")`).
 
 Isolation rules:
 - Each test runs in a fresh root environment; `def` targets that root — even when called from a nested function or a loaded file — so bindings never leak across tests
-- `require` cache and `gensym` counter reset between tests
-- The file prelude re-evaluates before each `(test …)` in the file (`beforeEach` semantics). This lets you lift shared `require`/`def`/`defn` to the top of a file while preserving per-test isolation. A top-level `(require "stdlib.lisp")` therefore fires once per test, not once per file.
+- `require` cache and `gensym` counter reset between tests (host tier)
+- The file prelude re-evaluates before each `(test …)` in the file (`beforeEach` semantics). This lets you lift shared `def`/`defn` — and, in host tests, `require` — to the top of a file while preserving per-test isolation. A top-level `(require "stdlib.lisp")` therefore fires once per test, not once per file.
