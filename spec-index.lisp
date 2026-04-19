@@ -64,4 +64,5 @@
     "defn-errors.lisp"]
 
    :contracts
-   ["language-contract.lisp"]})
+   ["language-contract.lisp"
+    "test-harness-basic.lisp"]})

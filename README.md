@@ -436,6 +436,9 @@ The spec is tested via `.lisp` files using these forms (implemented as special f
 - `(assert/equal actual expected)` — deep equality assertion
 - `(assert/throws (fn [] expr) "substring")` — error assertion
 
+File structure: a test file is a sequence of top-level forms. Forms that are `(test …)` blocks are collected as tests; anything else is a **file prelude** (e.g. `(require "stdlib.lisp")`, `(def shared-helper …)`, `(defn helper […] …)`).
+
 Isolation rules:
 - Each test runs in a fresh root environment; `def` targets that root — even when called from a nested function or a loaded file — so bindings never leak across tests
 - `require` cache and `gensym` counter reset between tests
+- The file prelude re-evaluates before each `(test …)` in the file (`beforeEach` semantics). This lets you lift shared `require`/`def`/`defn` to the top of a file while preserving per-test isolation. A top-level `(require "stdlib.lisp")` therefore fires once per test, not once per file.
