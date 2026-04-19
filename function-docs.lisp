@@ -24,7 +24,7 @@
   (assert/equal ((fn [x] "hi") 1) "hi")
   (assert/equal (doc (fn [x] "hi")) nil))
 
-(test "doc works on function or macro values only"
-  (assert/throws (fn [] (doc 123)) "requires a function or macro")
-  (assert/throws (fn [] (doc null)) "requires a function or macro")
-  (assert/throws (fn [] (doc {:a 1})) "requires a function or macro"))
+(test "doc rejects non-function non-macro non-builtin values"
+  (assert/throws (fn [] (doc 123)) "doc requires a function, macro, or builtin")
+  (assert/throws (fn [] (doc null)) "doc requires a function, macro, or builtin")
+  (assert/throws (fn [] (doc {:a 1})) "doc requires a function, macro, or builtin"))

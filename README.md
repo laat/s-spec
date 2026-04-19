@@ -126,7 +126,9 @@ Quoted literals are ordinary data, not a tagged AST: `(quote {:a 1})` is an obje
 
 `unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
 
-Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`.
+Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`. Directly as the `quasiquote` argument with no enclosing container — `` `(splice-unquote xs) `` — there is nothing to splice into, so it throws `"splice-unquote requires a list or array"` (the same substring used when the spliced value is not a sequence).
+
+All of the above — splicing, key-position rejection, no-container rejection — apply only at **depth 1** (the enclosing `quasiquote` currently being expanded). Each nested `quasiquote` increments depth; each `unquote` / `splice-unquote` decrements it. At depth > 1 the forms are preserved as literal data for the inner `quasiquote` to handle, and no validation fires. So `` ``{(splice-unquote x) 1} `` expands to the form `` `{(splice-unquote x) 1} `` without raising.
 
 The `parse` builtin exposes the reader directly — it returns a form without semantic validation. Input must contain exactly one form; trailing tokens after the first form throw `"unexpected trailing"` at read time.
 
@@ -157,9 +159,43 @@ Functions bound in the global environment.
 | `parse` | `(parse str)` | Read s-spec source string into a form. No semantic validation. |
 | `json/parse` | `(json/parse str)` | Parse strict JSON into s-spec values (see *JSON Serialization*). |
 | `json/stringify` | `(json/stringify v)` | Serialize to compact JSON (see *JSON Serialization*). |
-| `doc` | `(doc fn-or-macro)` | Get docstring. Accepts both functions and macros. |
-| `gensym` | `(gensym [prefix])` | Unique symbol. |
+| `doc` | `(doc v)` | Get docstring. Accepts functions, macros, and builtins; throws `"doc requires a function, macro, or builtin"` on any other value. Returns `nil` for a function or macro with no docstring; returns the canonical one-line docstring (see *Builtin Docstrings*) for every builtin. |
+| `gensym` | `(gensym [prefix])` | Unique symbol. Output is `<prefix>__<n>` where `<n>` is a monotonically increasing counter starting at `1`. Default prefix is `"G"`, so `(gensym)` produces `G__1`, `G__2`, …. The counter resets between tests (see *Test Harness*). |
 | `error` | `(error msg)` | Throw an error. |
+
+### Builtin Docstrings
+
+`doc` on a builtin MUST return exactly the string listed here. This makes `(doc +)` interchangeable across host implementations.
+
+| Builtin | Docstring |
+|---------|-----------|
+| `+` | `Add numbers.` |
+| `first` | `Return the head of a pair.` |
+| `rest` | `Return the tail of a pair.` |
+| `cons` | `Create a pair from head and tail.` |
+| `list` | `Build a proper list from items.` |
+| `array` | `Build an array from items.` |
+| `object` | `Build an object from alternating keyword keys and values.` |
+| `length` | `Length of an array, string, or list.` |
+| `get` | `Look up a key in an array or object.` |
+| `nil?` | `True when the value is nil.` |
+| `null?` | `True when the value is null.` |
+| `pair?` | `True when the value is a pair.` |
+| `list?` | `True when the value is nil or a proper list.` |
+| `array?` | `True when the value is an array.` |
+| `symbol?` | `True when the value is a symbol.` |
+| `=` | `Deep equality; identity for callables.` |
+| `/=` | `Logical inverse of =.` |
+| `print` | `Canonical string representation of a value.` |
+| `parse` | `Read an s-spec source string into a form.` |
+| `json/parse` | `Parse strict JSON into an s-spec value.` |
+| `json/stringify` | `Serialize a value to compact JSON.` |
+| `doc` | `Get the docstring of a function, macro, or builtin.` |
+| `gensym` | `Unique symbol.` |
+| `error` | `Throw an error with the given message.` |
+| `bound?` | `True when the given symbol is bound in the caller's env.` |
+| `macroexpand-1` | `Expand the form once at the head, if it is a macro call.` |
+| `macroexpand` | `Repeatedly macroexpand at the head until a fixpoint.` |
 
 ### Caller-Env Forms
 

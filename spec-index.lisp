@@ -10,6 +10,7 @@
     "object.lisp"
     "function-basic.lisp"
     "function-docs.lisp"
+    "builtin-docs.lisp"
     "rest-params-basic.lisp"
     "def-basic.lisp"
     "def-errors.lisp"

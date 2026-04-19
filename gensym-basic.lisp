@@ -13,6 +13,11 @@
 (test "gensym requires zero or one argument"
   (assert/throws (fn [] (gensym "a" "b")) "gensym requires zero or one argument"))
 
+(test "gensym output format is prefix__N starting at 1"
+  (assert/equal (print (gensym)) "G__1")
+  (assert/equal (print (gensym)) "G__2")
+  (assert/equal (print (gensym "tmp")) "tmp__3"))
+
 (test "gensym helps avoid macro capture"
   (require "stdlib.lisp")
   (defmacro first-or-safe [a b]

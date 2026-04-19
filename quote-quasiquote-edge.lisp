@@ -16,10 +16,20 @@
     (fn [] (quasiquote (list (splice-unquote {:a 1}) 3)))
     "splice-unquote requires a list or array"))
 
+(test "splice-unquote at top of quasiquote has no container"
+  (assert/throws
+    (fn [] (quasiquote (splice-unquote (list 1 2 3))))
+    "splice-unquote requires a list or array"))
+
 (test "splice-unquote is invalid in object key position"
   (assert/throws
     (fn [] (quasiquote {(splice-unquote [:a]) 1}))
     "splice-unquote is not valid in object key position"))
+
+(test "splice-unquote object-key check fires only at depth 1"
+  (assert/equal
+    (print (quasiquote (quasiquote {(splice-unquote x) 1})))
+    "(quasiquote {(splice-unquote x) 1})"))
 
 (test "splice-unquote in object value position is allowed"
   (assert/equal
