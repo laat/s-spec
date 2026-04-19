@@ -18,12 +18,6 @@
   (assert/equal (:more (collect 1 2 3 4)) (list 3 4))
   (assert/equal (:more (collect 1 2)) nil))
 
-(test "rest parameter in defmacro"
-  (defmacro do-all [& body]
-    (quasiquote (do (splice-unquote body))))
-  (assert/equal (do-all 1 2 3) 3)
-  (assert/equal (do-all "only") "only"))
-
 (test "fixed arity still enforced before rest"
   (assert/throws (fn [] ((fn [x y & more] x) 1)) "arity mismatch"))
 

@@ -33,3 +33,9 @@
   (defmacro if [p t e] (quasiquote (+ (unquote p) 100)))
   (assert/equal (if true 1 2) 1)
   (assert/equal (if false 1 2) 2))
+
+(test "defmacro supports rest parameters"
+  (defmacro do-all [& body]
+    (quasiquote (do (splice-unquote body))))
+  (assert/equal (do-all 1 2 3) 3)
+  (assert/equal (do-all "only") "only"))
