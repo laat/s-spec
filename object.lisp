@@ -66,3 +66,13 @@
   (assert/equal (quote {:a 1}) {:a 1})
   (assert/equal (quote {:a 1}) (quote {:a 1}))
   (assert/equal (= (quote {:a 1}) (object :a 1)) true))
+
+(test "quote validates object keys"
+  (assert/throws (fn [] (quote {"a" 1})) "object keys must be keywords")
+  (assert/throws (fn [] (quote {1 2})) "object keys must be keywords")
+  (assert/throws (fn [] (quote {null 1})) "object keys must be keywords"))
+
+(test "quote preserves form values without evaluating"
+  (assert/equal
+    (print (quote {:a (+ 1 2)}))
+    "{:a (+ 1 2)}"))

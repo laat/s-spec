@@ -124,6 +124,13 @@ All semantic validation happens at eval time:
 
 Quoted literals are ordinary data, not a tagged AST: `(quote {:a 1})` is an object with key `:a` and value `1`, identical to the runtime object `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms — there is no separate "object literal" type.
 
+**Object literal key validation.** `{…}` is a form. Two construction paths produce a runtime Object from it, and **both validate that every key is a keyword**:
+
+- **Evaluation** — validate keys, evaluate each value, build the Object.
+- **Quote** — validate keys, take values unevaluated (each value may itself be any form, including a list), build the Object.
+
+Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps Object a single runtime type whose keys are always keywords, and removes the need for any hidden object-literal AST.
+
 `unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
 
 Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`. Directly as the `quasiquote` argument with no enclosing container — `` `(splice-unquote xs) `` — there is nothing to splice into, so it throws `"splice-unquote requires a list or array"` (the same substring used when the spliced value is not a sequence).
