@@ -32,6 +32,19 @@
 (test "fn params must be a vector"
   (assert/throws (fn [] (fn x (+ x 1))) "fn params must be a vector"))
 
+(test "fn with no args at all"
+  (assert/throws (fn [] (fn)) "fn requires params and a body"))
+
+(test "fn param names must be symbols"
+  (assert/throws (fn [] (fn [1] 1)) "fn param names must be symbols")
+  (assert/throws (fn [] (fn [:k] 1)) "fn param names must be symbols")
+  (assert/throws (fn [] (fn ["x"] 1)) "fn param names must be symbols"))
+
+(test "fn & must be followed by exactly one rest name"
+  (assert/throws (fn [] (fn [x &] x)) "& must be followed by exactly one rest name")
+  (assert/throws (fn [] (fn [& x y] x)) "& must be followed by exactly one rest name")
+  (assert/throws (fn [] (fn [& &] 1)) "& must be followed by exactly one rest name"))
+
 (test "fn requires a body"
   (assert/throws (fn [] (fn [x y])) "fn requires a body")
   (assert/throws (fn [] (fn [])) "fn requires a body"))

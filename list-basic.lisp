@@ -42,3 +42,13 @@
   (assert/equal (print (cons 1 (cons 2 3))) "(1 2 . 3)")
   (assert/equal (print (cons 1 (cons 2 (cons 3 :end)))) "(1 2 3 . :end)")
   (assert/equal (print (cons :a (cons :b :c))) "(:a :b . :c)"))
+
+(test "first and rest throw on non-pair non-nil"
+  (assert/throws (fn [] (first 42)) "first requires a pair or nil")
+  (assert/throws (fn [] (first "hello")) "first requires a pair or nil")
+  (assert/throws (fn [] (first [1 2 3])) "first requires a pair or nil")
+  (assert/throws (fn [] (first {:a 1})) "first requires a pair or nil")
+  (assert/throws (fn [] (rest 42)) "rest requires a pair or nil")
+  (assert/throws (fn [] (rest "hello")) "rest requires a pair or nil")
+  (assert/throws (fn [] (rest [1 2 3])) "rest requires a pair or nil")
+  (assert/throws (fn [] (rest {:a 1})) "rest requires a pair or nil"))

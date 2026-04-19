@@ -65,6 +65,11 @@
     (quasiquote ((splice-unquote nil)))
     nil))
 
+(test "splicing an improper pair hits the value-type error"
+  (assert/throws
+    (fn [] (quasiquote (a (splice-unquote (cons 1 2)) b)))
+    "splice-unquote value must be a list or array"))
+
 (test "unquote and splice-unquote require quasiquote context"
   (assert/throws (fn [] (unquote 1)) "unquote outside quasiquote")
   (assert/throws (fn [] (splice-unquote [1 2])) "splice-unquote outside quasiquote"))

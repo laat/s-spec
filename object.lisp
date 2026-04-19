@@ -35,6 +35,10 @@
   (assert/throws (fn [] (:key [1 2 3])) "requires an object")
   (assert/throws (fn [] (:key (list 1 2 3))) "requires an object"))
 
+(test "keyword-as-function arity"
+  (assert/throws (fn [] (:key)) "keyword lookup requires one or two arguments")
+  (assert/throws (fn [] (:key {:a 1} :default :extra)) "keyword lookup requires one or two arguments"))
+
 (test "duplicate keys are last-write-wins"
   (assert/equal {:a 1 :a 2} {:a 2})
   (assert/equal (get {:a 1 :a 2} :a) 2)

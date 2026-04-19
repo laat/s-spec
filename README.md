@@ -150,8 +150,8 @@ Functions bound in the global environment.
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `+` | `(+ nums...)` | Addition. `(+)` → `0`. |
-| `first` | `(first pair)` | Head of pair. `(first nil)` → `nil`. |
-| `rest` | `(rest pair)` | Tail of pair. `(rest nil)` → `nil`. |
+| `first` | `(first pair)` | Head of pair. `(first nil)` → `nil`. Throws `"first requires a pair or nil"` on any other value. |
+| `rest` | `(rest pair)` | Tail of pair. `(rest nil)` → `nil`. Throws `"rest requires a pair or nil"` on any other value. |
 | `cons` | `(cons a b)` | Create pair. |
 | `list` | `(list items...)` | Build proper list. `(list)` → `nil`. |
 | `array` | `(array items...)` | Build array. |
@@ -329,6 +329,9 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | `(defmacro "m" [x] x)` | `defmacro name must be a symbol` |
 | `(defmacro m x x)` | `defmacro params must be a vector` |
 | `(defmacro m [x])` — no body | `defmacro requires a body` |
+| `(fn)` with no arguments | `fn requires params and a body` |
+| `(fn [1] …)` / `(fn [:k] …)` / `(fn ["x"] …)` — non-symbol in params | `fn param names must be symbols` |
+| `(fn [x &] …)` / `(fn [& x y] …)` / `(fn [& &] …)` — `&` misuse | `& must be followed by exactly one rest name` |
 | `(defmacroonce "m" …)` | `defmacroonce name must be a symbol` |
 | `(defmacroonce m x x)` | `defmacroonce params must be a vector` |
 | `(defmacroonce m [x])` | `defmacroonce requires a body` |
@@ -353,6 +356,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Non-keyword key in `{…}`, `(object …)`, `(quote {…})`, or computed via `(unquote …)` | `object keys must be keywords` |
 | `(object …)` called with an odd number of arguments | `object arity mismatch` |
 | `(:key …)` applied to any non-object value | `requires an object` |
+| `(:key)` / `(:key obj d extra)` — keyword-as-function with zero or 3+ args | `keyword lookup requires one or two arguments` |
 
 **Callable / arity**
 
@@ -361,6 +365,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Too few or too many positional args to a user function | `arity mismatch` |
 | Head of a call form is not a function, macro, builtin, or keyword | `requires a function` |
 | `(get v …)` where `v` is not an array, object, or `nil` | `get requires an array or object` (tests match the shorter `get requires`) |
+| `(first v)` / `(rest v)` where `v` is neither a pair nor `nil` | `first requires a pair or nil` / `rest requires a pair or nil` |
 
 **Resolution / binding**
 
@@ -384,6 +389,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Condition | Substring |
 |---|---|
 | `(load v)` / `(require v)` where `v` is not a string | `load requires a string path` / `require requires a string path` |
+| `(load)` / `(load a b)` / `(require)` / `(require a b)` — wrong arity | `load requires exactly one argument` / `require requires exactly one argument` |
 | Target file does not exist | `file not found` |
 
 **JSON**
