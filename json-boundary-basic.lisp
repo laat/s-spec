@@ -22,6 +22,12 @@
     (json/stringify {:name "Ada" :active true :tags ["math" "logic"]})
     "{\"name\":\"Ada\",\"active\":true,\"tags\":[\"math\",\"logic\"]}"))
 
+(test "json/parse does not preserve integer/decimal distinction"
+  (assert/equal (json/parse "1") (json/parse "1.0"))
+  (assert/equal (json/stringify (json/parse "1.0")) "1")
+  (assert/equal (json/stringify 1.0) "1")
+  (assert/equal (json/stringify 1.5) "1.5"))
+
 (test "json boundary keeps nil distinct from null"
   (assert/equal (json/parse "null") null)
   (assert/throws (fn [] (json/stringify nil)) "json/stringify does not support nil"))

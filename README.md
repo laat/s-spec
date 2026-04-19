@@ -111,6 +111,10 @@ Functions bound in the global environment.
 
 Keywords are callable: `(:name obj)` is equivalent to `(get obj :name)`. Accepts optional default: `(:name obj fallback)`.
 
+### JSON Numbers
+
+Numbers are float64. `json/parse` does not preserve the integer/decimal distinction — `1` and `1.0` read to the same value. `json/stringify` emits the shortest decimal that round-trips, using integer form when the value is integral, so `(json/stringify 1.0)` is `"1"`. A JSON source literal like `1.0` does not survive a round-trip as `"1.0"`.
+
 ### stdlib
 
 The standard library (`stdlib.lisp`) defines these from primitives. Host implementations may inline them as special forms for performance, but semantics must match.
