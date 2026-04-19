@@ -12,7 +12,6 @@
   (assert/equal (bound? 'false-value) true))
 
 (test "bound? walks the lexical chain"
-  (require "stdlib.lisp")
   (assert/equal
     (let [local-x 1] (bound? 'local-x))
     true)
@@ -21,7 +20,6 @@
     true))
 
 (test "bound? returns false outside the binding scope"
-  (require "stdlib.lisp")
   (let [transient 1] transient)
   (assert/equal (bound? 'transient) false))
 

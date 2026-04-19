@@ -19,7 +19,7 @@
   (assert/equal (print (gensym "tmp")) "tmp__3"))
 
 (test "gensym helps avoid macro capture"
-  (require "stdlib.lisp")
+  (require "../../stdlib.lisp")
   (defmacro first-or-safe [a b]
     (let [g (gensym)]
       (quasiquote (let [(unquote g) (unquote a)]

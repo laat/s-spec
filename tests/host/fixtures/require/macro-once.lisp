@@ -1,4 +1,4 @@
-(require "../../stdlib.lisp")
+(require "../../../../stdlib.lisp")
 
 (def require_macro_count (+ require_macro_count 1))
 

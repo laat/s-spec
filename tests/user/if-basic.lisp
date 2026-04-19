@@ -10,7 +10,6 @@
   (assert/equal (if nil 1 2) 2))
 
 (test "if is an expression"
-  (require "stdlib.lisp")
   (assert/equal (+ 1 (if true 2 3)) 3)
   (assert/equal (let [x 10] (if x "big" "small")) "big"))
 

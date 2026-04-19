@@ -1,5 +1,5 @@
 (test "macro style error: expansion can violate let contract"
-  (require "stdlib.lisp")
+  (require "../../stdlib.lisp")
   (defmacro bad-let [x]
     (quasiquote (let [123 (unquote x)] 0)))
   (assert/throws (fn [] (bad-let 1)) "let binding name must be a symbol"))
