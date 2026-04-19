@@ -15,6 +15,12 @@
   (assert/equal (get {:a 1 :b null} :c) nil)
   (assert/equal (get {:a 1} :c "fallback") "fallback"))
 
+(test "get with non-keyword key on object returns default"
+  (assert/equal (get {:a 1} 0) nil)
+  (assert/equal (get {:a 1} "a") nil)
+  (assert/equal (get {:a 1} 0 :missing) :missing)
+  (assert/equal (get {:a 1} "a" :missing) :missing))
+
 (test "keywords are callable"
   (assert/equal (:a {:a 1 :b 2}) 1)
   (assert/equal (:b {:a 1 :b null}) null)
@@ -44,3 +50,19 @@
   (assert/throws (fn [] {1 2}) "object keys must be keywords")
   (assert/throws (fn [] {null 1}) "object keys must be keywords")
   (assert/throws (fn [] {[1] 2}) "object keys must be keywords"))
+
+(test "object literal and constructor"
+  (assert/equal {} (object))
+  (assert/equal {:a 1} (object :a 1))
+  (assert/equal {:a 1 :b 2} (object :a 1 :b 2)))
+
+(test "object constructor validates arity and key type"
+  (assert/throws (fn [] (object :a)) "object arity mismatch")
+  (assert/throws (fn [] (object :a 1 :b)) "object arity mismatch")
+  (assert/throws (fn [] (object "a" 1)) "object keys must be keywords")
+  (assert/throws (fn [] (object 1 2)) "object keys must be keywords"))
+
+(test "quoted object literal equals runtime object"
+  (assert/equal (quote {:a 1}) {:a 1})
+  (assert/equal (quote {:a 1}) (quote {:a 1}))
+  (assert/equal (= (quote {:a 1}) (object :a 1)) true))

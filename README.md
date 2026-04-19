@@ -84,6 +84,26 @@ A token that starts with a digit, or with `-` followed by a digit, is a number a
 
 This matches `json/parse` exactly, so any literal valid as a JSON number is valid as a source number, and vice versa.
 
+### Symbol and Keyword Names
+
+The body of a symbol, or the unquoted body of a keyword, is a **name**:
+
+    name-char  = %x41-5A / %x61-7A / %x30-39     ; A-Z a-z 0-9
+               / "_" / "+" / "-" / "*" / "/"
+               / "?" / "!" / "<" / ">" / "=" / "." / "&"
+    symbol     = (name-char - digit) *name-char  ; first char cannot start a number
+    kw-name    = 1*name-char                     ; first char may be a digit (the `:` disambiguates)
+
+`:` is not a name character — it's reserved as the keyword prefix. Symbol first-char restrictions follow from the Number Grammar (tokens that start with a digit or `-digit` are numbers).
+
+Keywords whose body contains any character outside the name grammar — whitespace, comma, `()[]{}`, `"`, `;`, `'`, `` ` ``, `~`, `:` — MUST use the quoted form `:"..."`, which permits any characters with standard string escapes. The empty body `:""` also requires the quoted form.
+
+Examples:
+- Unquoted: `:foo`, `:cfg/port`, `:+`, `:<=`, `:a-b`, `:2023`
+- Quoted required: `:"foo bar"`, `:"a:b"`, `:"a,b"`, `:"a;b"`, `:""`
+
+**Printer rule.** When printing a keyword, emit the unquoted form if the name matches the grammar above; otherwise emit the quoted form. Symbol printing is unconditional (symbols always have valid names by construction).
+
 ### Validation Model
 
 The reader is a pure syntax-to-AST converter. It handles:
@@ -97,7 +117,16 @@ All semantic validation happens at eval time:
 - Object key type validation (must be keywords)
 - `unquote` / `splice-unquote` quasiquote context requirement
 
+**Literal-to-constructor equivalence.** The literal forms `[…]` and `{…}` are equivalent to calls to their constructors — they share representation and equality semantics:
+
+- `[v1 v2 …]` evaluates to the same value as `(array v1 v2 …)` — so `(= [1 2] (array 1 2))` is `true`
+- `{:k1 v1 :k2 v2 …}` evaluates to the same value as `(object :k1 v1 :k2 v2 …)` — so `(= {:a 1} (object :a 1))` is `true`
+
+Quoted literals are ordinary data, not a tagged AST: `(quote {:a 1})` is an object with key `:a` and value `1`, identical to the runtime object `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms — there is no separate "object literal" type.
+
 `unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
+
+Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`.
 
 The `parse` builtin exposes the reader directly — it returns a form without semantic validation. Input must contain exactly one form; trailing tokens after the first form throw `"unexpected trailing"` at read time.
 
@@ -113,8 +142,9 @@ Functions bound in the global environment.
 | `cons` | `(cons a b)` | Create pair. |
 | `list` | `(list items...)` | Build proper list. `(list)` → `nil`. |
 | `array` | `(array items...)` | Build array. |
+| `object` | `(object items...)` | Build object. Items alternate keyword keys and values. Throws `"object arity mismatch"` on odd count and `"object keys must be keywords"` on non-keyword keys. |
 | `length` | `(length v)` | Length of array, string, or list. |
-| `get` | `(get coll key [default])` | Index into array or key into object. Array indices must be integers; out-of-bounds or non-integer indices return the default (or `nil` if none given). |
+| `get` | `(get coll key [default])` | Look up in an array (integer index) or object (keyword key). Returns the default (or `nil` if none given) when `coll` is `nil`, or when the key/index type doesn't match the collection, or when the index is out of bounds / key missing. Throws `"get requires an array or object"` for any other value — numbers, strings, booleans, improper pairs. |
 | `nil?` | `(nil? v)` | |
 | `null?` | `(null? v)` | |
 | `pair?` | `(pair? v)` | |
@@ -127,7 +157,7 @@ Functions bound in the global environment.
 | `parse` | `(parse str)` | Read s-spec source string into a form. No semantic validation. |
 | `json/parse` | `(json/parse str)` | Parse strict JSON into s-spec values (see *JSON Serialization*). |
 | `json/stringify` | `(json/stringify v)` | Serialize to compact JSON (see *JSON Serialization*). |
-| `doc` | `(doc fn)` | Get docstring. |
+| `doc` | `(doc fn-or-macro)` | Get docstring. Accepts both functions and macros. |
 | `gensym` | `(gensym [prefix])` | Unique symbol. |
 | `error` | `(error msg)` | Throw an error. |
 
@@ -143,24 +173,34 @@ These three forms are listed separately from the builtins because they require a
 
 ### Keyword-as-function
 
-Keywords are callable: `(:name obj)` is equivalent to `(get obj :name)`. Accepts optional default: `(:name obj fallback)`.
+Keywords are callable: `(:name obj)` looks up `:name` in `obj`, with optional default: `(:name obj fallback)`. Unlike `get` (which is lenient), keyword-as-function is strict: `obj` must be an object, and any other value — including `nil`, `null`, arrays, numbers, strings, lists — throws `"requires an object"`.
 
 ### Canonical Printing
 
 `print` emits a canonical string representation. For data values the output is re-readable — feeding it back through `parse` yields an equal value:
 
-- numbers, strings, booleans, `nil`, `null`, symbols, keywords — as written
+- numbers — see *Number Printing* below
+- strings, booleans, `nil`, `null`, symbols, keywords — as written
 - arrays, objects, proper lists — as literal syntax
-- integers use integer form; non-integers use the shortest decimal that round-trips (same rule as `json/stringify`, so `(print 1.0)` is `"1"`)
 
-Non-data values — functions, macros, builtins, and improper pairs — have an implementation-defined string representation, subject to two requirements:
+**Number Printing.** Numbers are float64. For a finite value `v`:
 
-1. The output MUST be legal s-spec source: `(parse (print v))` must succeed.
-2. The parsed result MUST NOT be equal to the original: `(= v (parse (print v)))` must return `false`.
+- if `v` is integral and `|v| < 1e21`, emit the integer form (no decimal point, no exponent) — so `(print 1.0)` is `"1"` and `(print 1e10)` is `"10000000000"`
+- otherwise, emit the shortest decimal that round-trips to the same float64. Scientific notation uses lowercase `e` with a signed exponent: `1e+21`, `1.5e-10`
 
-Since functions, macros, and builtins compare by identity and improper pairs have no data-literal syntax, requirement (2) is automatically satisfied by any legal-source output (a parsed symbol or list will never be `=` to a function or an improper pair). The practical contract is: **print output must always be parseable.**
+The threshold `1e21` matches the ECMAScript `Number.toString` rule, so s-spec number output is interchangeable with JavaScript / standard JSON. Above the threshold, integer form would require 22+ digits; scientific is always shorter. `json/stringify` uses exactly the same formatter.
 
-Impls may use any legal-source form — e.g. a symbol like `<fn>` or a list like `(fn)` or `(builtin +)`. Improper pairs are typically printed as a list such as `(cons 1 2)` or `(1 . 2)` — the latter requires `.` to be a legal symbol so the form parses as a 3-element list.
+
+Non-data values print as fixed list forms. The output is always legal source and never `=` to the original value (since a parsed list is never `=` to a function, macro, builtin, or improper pair):
+
+| Value          | Print form                                         |
+|----------------|----------------------------------------------------|
+| function       | `(fn)`                                             |
+| macro          | `(macro)`                                          |
+| builtin        | `(builtin NAME)` — `NAME` is the builtin's symbol  |
+| improper pair  | `(A . B)` — where `A` and `B` are recursive prints |
+
+The improper-pair form relies on `.` being a legal one-character symbol, which it is under the name grammar (`.` is a name-char and not digit-first).
 
 ### JSON Serialization
 
@@ -172,7 +212,7 @@ Numbers are float64. `json/parse` does not preserve the integer/decimal distinct
 |------------------|-----------------------------------------------------------------------|
 | `null`           | `null`                                                                |
 | boolean          | `true` / `false`                                                      |
-| number (finite)  | shortest decimal that round-trips; integer form when integral         |
+| number (finite)  | same formatter as `print` (see *Number Printing* above)               |
 | string           | JSON string with standard escapes                                     |
 | array            | JSON array (recurses)                                                 |
 | object           | JSON object; keys are the keyword names without the leading `:`       |

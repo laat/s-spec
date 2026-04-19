@@ -16,3 +16,8 @@
   (assert/equal
     (print (parse "' ; quote next form\n(+ 1 2)"))
     "(quote (+ 1 2))"))
+
+(test "quasiquote unquote and splice-unquote shorthands skip comments"
+  (assert/equal
+    (print (parse "` ; qq\n(a ~ ; uq\n b ~@ ; sp\n cs)"))
+    "(quasiquote (a (unquote b) (splice-unquote cs)))"))

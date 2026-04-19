@@ -30,6 +30,23 @@
   (assert/equal (get [10 20 30] 0.5 :missing) :missing)
   (assert/equal (get [10 20 30] -0.1 :missing) :missing))
 
+(test "array get with keyword index returns default"
+  (assert/equal (get [10 20 30] :x) nil)
+  (assert/equal (get [10 20 30] :x :missing) :missing))
+
+(test "get on nil returns default"
+  (assert/equal (get nil :x) nil)
+  (assert/equal (get nil 0) nil)
+  (assert/equal (get nil :x :d) :d)
+  (assert/equal (get nil 0 :d) :d))
+
+(test "get on non-collection throws"
+  (assert/throws (fn [] (get 42 :x)) "get requires")
+  (assert/throws (fn [] (get "str" 0)) "get requires")
+  (assert/throws (fn [] (get true :x)) "get requires")
+  (assert/throws (fn [] (get (cons 1 2) :x)) "get requires")
+  (assert/throws (fn [] (get (list 1 2 3) :x)) "get requires"))
+
 (test "nested arrays"
   (assert/equal (get [1 [2 3] 4] 1) [2 3])
   (assert/equal (get (get [1 [2 3] 4] 1) 0) 2))

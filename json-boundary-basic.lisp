@@ -28,6 +28,22 @@
   (assert/equal (json/stringify 1.0) "1")
   (assert/equal (json/stringify 1.5) "1.5"))
 
+(test "number printing uses integer form for integral values below 1e21"
+  (assert/equal (json/stringify 1.0) "1")
+  (assert/equal (json/stringify 1000.0) "1000")
+  (assert/equal (json/stringify 1e10) "10000000000")
+  (assert/equal (json/stringify 1e15) "1000000000000000")
+  (assert/equal (print 1e10) "10000000000"))
+
+(test "number printing uses scientific form at or above 1e21"
+  (assert/equal (json/stringify 1e21) "1e+21")
+  (assert/equal (print 1e21) "1e+21"))
+
+(test "number printing uses shortest round-trip decimal for non-integers"
+  (assert/equal (json/stringify 0.5) "0.5")
+  (assert/equal (json/stringify -0.25) "-0.25")
+  (assert/equal (print 1.5) "1.5"))
+
 (test "json boundary keeps nil distinct from null"
   (assert/equal (json/parse "null") null)
   (assert/throws (fn [] (json/stringify nil)) "json/stringify does not support nil"))

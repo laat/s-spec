@@ -26,3 +26,7 @@
 
 (test "fixed arity still enforced before rest"
   (assert/throws (fn [] ((fn [x y & more] x) 1)) "arity mismatch"))
+
+(test "zero-rest binds nil, not empty array or zero-length list-like"
+  (assert/equal (nil? ((fn [& xs] xs))) true)
+  (assert/equal (= ((fn [& xs] xs)) []) false))

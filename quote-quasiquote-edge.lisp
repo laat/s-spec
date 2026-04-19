@@ -21,6 +21,11 @@
     (fn [] (quasiquote {(splice-unquote [:a]) 1}))
     "splice-unquote is not valid in object key position"))
 
+(test "splice-unquote in object value position is allowed"
+  (assert/equal
+    (quasiquote {:xs (splice-unquote (list 1 2 3))})
+    {:xs (list 1 2 3)}))
+
 (test "unquote and splice-unquote require quasiquote context"
   (assert/throws (fn [] (unquote 1)) "unquote outside quasiquote")
   (assert/throws (fn [] (splice-unquote [1 2])) "splice-unquote outside quasiquote"))

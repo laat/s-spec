@@ -55,6 +55,23 @@
   (assert/equal (print (parse "{:\"foo\" 1}")) "{:foo 1}")
   (assert/equal (print (parse "{:\"foo bar\" 2}")) "{:\"foo bar\" 2}"))
 
+(test "print keyword with simple name uses unquoted form"
+  (assert/equal (print :foo) ":foo")
+  (assert/equal (print :cfg/port) ":cfg/port")
+  (assert/equal (print :a-b) ":a-b")
+  (assert/equal (print :<=) ":<=")
+  (assert/equal (print :+) ":+"))
+
+(test "print keyword with digit-first body uses unquoted form"
+  (assert/equal (print :"2023") ":2023")
+  (assert/equal (print (parse ":\"2023\"")) ":2023"))
+
+(test "print keyword with special characters uses quoted form"
+  (assert/equal (print :"foo bar") ":\"foo bar\"")
+  (assert/equal (print :"a,b") ":\"a,b\"")
+  (assert/equal (print :"a:b") ":\"a:b\"")
+  (assert/equal (print :"a;b") ":\"a;b\""))
+
 (test "parse canonicalizes object whitespace"
   (assert/equal (print (parse " { :a   1   :b   [ 2  3 ] } ")) "{:a 1 :b [2 3]}")
   (assert/equal (print (parse "{ :\"foo bar\"   2  :z  9 }")) "{:\"foo bar\" 2 :z 9}"))
