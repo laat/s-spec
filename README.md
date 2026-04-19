@@ -53,9 +53,24 @@ Built-in shorthands that expand during reading. These are not user-definable.
 |--------|-----------|
 | `'x` | `(quote x)` |
 | `` `x `` | `(quasiquote x)` |
-| `~x` | `(unquote x)` — only inside `` ` `` |
-| `~@x` | `(splice-unquote x)` — only inside `` ` `` |
+| `~x` | `(unquote x)` |
+| `~@x` | `(splice-unquote x)` |
 | `;` | Comment to end of line |
+
+### Validation Model
+
+The reader is a pure syntax-to-AST converter. It handles:
+- Tokenization (numbers, strings, symbols, keywords, booleans, `nil`, `null`)
+- Delimiter matching (`(` `)`, `[` `]`, `{` `}`)
+- Reader shorthand expansion (`'x` → `(quote x)`, etc.)
+- Object literal structure (even number of forms)
+
+All semantic validation happens at eval time:
+- Special-form arity and argument types (`def`, `fn`, `if`, `defmacro`, `quote`, `quasiquote`)
+- Object key type validation (must be keywords)
+- `unquote` / `splice-unquote` quasiquote context requirement
+
+The `parse` builtin exposes the reader directly — it returns a form without semantic validation.
 
 ### Builtins
 
@@ -81,7 +96,7 @@ Functions bound in the global environment.
 | `=` | `(= vals...)` | Deep equality. Objects ignore key order. `(=)` → `true`. |
 | `/=` | `(/= vals...)` | Logical inverse of `=`. `(/=)` → `false`. |
 | `print` | `(print v)` | Canonical string representation. |
-| `parse` | `(parse str)` | Parse s-spec source string into a form. |
+| `parse` | `(parse str)` | Read s-spec source string into a form. No semantic validation. |
 | `json/parse` | `(json/parse str)` | Parse strict JSON into s-spec values. |
 | `json/stringify` | `(json/stringify v)` | Serialize to compact JSON. Rejects nil, lists, functions. |
 | `doc` | `(doc fn)` | Get docstring. |
@@ -118,3 +133,8 @@ The spec is tested via `.lisp` files using these forms (implemented as special f
 - `(test "name" body...)` — isolated test block
 - `(assert/equal actual expected)` — deep equality assertion
 - `(assert/throws (fn [] expr) "substring")` — error assertion
+
+Isolation rules:
+- Each `(test ...)` block runs in a fresh environment
+- `def` inside a test binds in the test's environment, not the root
+- `require` cache and `gensym` counter reset between tests

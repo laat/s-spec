@@ -28,3 +28,10 @@
   (assert/throws (fn [] (1 2 3)) "requires a function")
   (assert/throws (fn [] (null 1)) "requires a function")
   (assert/throws (fn [] ([1 2] 0)) "requires a function"))
+
+(test "fn params must be a vector"
+  (assert/throws (fn [] (fn x (+ x 1))) "fn params must be a vector"))
+
+(test "fn requires a body"
+  (assert/throws (fn [] (fn [x y])) "fn requires a body")
+  (assert/throws (fn [] (fn [])) "fn requires a body"))

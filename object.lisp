@@ -38,3 +38,9 @@
   (assert/equal
     (print (parse "{:z 1 :a 2 :m 3}"))
     "{:z 1 :a 2 :m 3}"))
+
+(test "object keys must be keywords"
+  (assert/throws (fn [] {"a" 1}) "object keys must be keywords")
+  (assert/throws (fn [] {1 2}) "object keys must be keywords")
+  (assert/throws (fn [] {null 1}) "object keys must be keywords")
+  (assert/throws (fn [] {[1] 2}) "object keys must be keywords"))
