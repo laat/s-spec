@@ -10,7 +10,7 @@ This section lists everything a host language must implement. The stdlib (`stdli
 
 | Type | Description |
 |------|-------------|
-| number | IEEE 754 float (1, -3, 4.2) |
+| number | finite IEEE 754 float64 (1, -3, 4.2) — `NaN`, `Infinity`, `-Infinity` are not representable |
 | string | UTF-8 with escapes: `\"` `\\` `\n` `\t` `\r` |
 | boolean | `true`, `false` |
 | nil | Empty list, falsey. Distinct from null. |
@@ -80,6 +80,7 @@ A token that starts with a digit, or with `-` followed by a digit, is a number a
 
 - Valid numbers: `0`, `1`, `-3`, `4.2`, `1e10`, `-2.5E-3`
 - Invalid — token starts number-like but doesn't match, throws `"invalid number"` at read time: `01`, `1.`, `1.e2`, `1a`, `123abc`
+- A literal that matches the grammar but overflows float64 (e.g. `1e400`) also throws `"invalid number"` at read time — numbers are finite
 - Symbols — no leading digit and not `-digit`: `+1`, `-`, `-x`, `.5`, `.x`, `a1`
 
 This matches `json/parse` exactly, so any literal valid as a JSON number is valid as a source number, and vice versa.
@@ -149,7 +150,7 @@ Functions bound in the global environment.
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `+` | `(+ nums...)` | Addition. `(+)` → `0`. |
+| `+` | `(+ nums...)` | Addition. `(+)` → `0`. Throws `"+ requires numbers"` on any non-number argument and `"arithmetic overflow"` if the result is not finite. |
 | `first` | `(first pair)` | Head of pair. `(first nil)` → `nil`. Throws `"first requires a pair or nil"` on any other value. |
 | `rest` | `(rest pair)` | Tail of pair. `(rest nil)` → `nil`. Throws `"rest requires a pair or nil"` on any other value. |
 | `cons` | `(cons a b)` | Create pair. |
@@ -230,7 +231,7 @@ Keywords are callable: `(:name obj)` looks up `:name` in `obj`, with optional de
 - strings, booleans, `nil`, `null`, symbols, keywords — as written
 - arrays, objects, proper lists — as literal syntax
 
-**Number Printing.** Numbers are float64. `print` on a finite number MUST produce exactly the string that ECMAScript's `Number.prototype.toString(10)` would (ECMA-262 §6.1.6.1.13 *Number::toString*). The same formatter is used by `json/stringify`. Hosts that already expose this rule (JavaScript, and most JSON libraries that implement ECMA-404's "shortest round-trip") can delegate directly; others must implement the algorithm.
+**Number Printing.** `print` on a number MUST produce exactly the string that ECMAScript's `Number.prototype.toString(10)` would (ECMA-262 §6.1.6.1.13 *Number::toString*). The same formatter is used by `json/stringify`. Hosts that already expose this rule (JavaScript, and most JSON libraries that implement ECMA-404's "shortest round-trip") can delegate directly; others must implement the algorithm. Because numbers are finite, `NaN` / `Infinity` / `-Infinity` never reach the printer.
 
 Informally, the rule produces:
 
@@ -268,12 +269,12 @@ Numbers are float64. `json/parse` does not preserve the integer/decimal distinct
 |------------------|-----------------------------------------------------------------------|
 | `null`           | `null`                                                                |
 | boolean          | `true` / `false`                                                      |
-| number (finite)  | same formatter as `print` (see *Number Printing* above)               |
+| number           | same formatter as `print` (see *Number Printing* above) — all numbers are finite |
 | string           | JSON string with standard escapes                                     |
 | array            | JSON array (recurses)                                                 |
 | object           | JSON object; keys are the keyword names without the leading `:`       |
 
-Every other value throws `"json/stringify does not support <type>"` where `<type>` is one of: `nil`, `list`, `pair`, `function`, `macro`, `builtin`, `symbol`, `keyword`, `NaN`, `Infinity`, `-Infinity`.
+Every other value throws `"json/stringify does not support <type>"` where `<type>` is one of: `nil`, `list`, `pair`, `function`, `macro`, `builtin`, `symbol`, `keyword`.
 
 `json/parse` accepts strict JSON only — no comments, no trailing commas, no unquoted keys, no `NaN`/`Infinity`. Duplicate object keys: last value wins (matches object-literal semantics).
 
@@ -309,7 +310,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Extra tokens after the first form in `parse` | `unexpected trailing` |
 | `"…` never closed | `unterminated string` |
 | `\q` or other unknown escape | `invalid string escape` |
-| `01`, `1.`, `1.e2`, `1a`, `123abc` | `invalid number` |
+| `01`, `1.`, `1.e2`, `1a`, `123abc`, or a literal that overflows float64 (`1e400`) | `invalid number` |
 | Bare `:` or `{: 1}` (no keyword body) | `invalid keyword` |
 | Object literal with an odd number of forms (reader-level check) | `requires an even number of forms` |
 | Reader shorthand with nothing after it | `expected form after quote` / `expected form after quasiquote` / `expected form after unquote` / `expected form after splice-unquote` |
@@ -366,6 +367,8 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Head of a call form is not a function, macro, builtin, or keyword | `requires a function` |
 | `(get v …)` where `v` is not an array, object, or `nil` | `get requires an array or object` (tests match the shorter `get requires`) |
 | `(first v)` / `(rest v)` where `v` is neither a pair nor `nil` | `first requires a pair or nil` / `rest requires a pair or nil` |
+| `(+ v …)` where any `v` is not a number | `+ requires numbers` |
+| `(+ …)` producing a non-finite result | `arithmetic overflow` |
 
 **Resolution / binding**
 
@@ -407,7 +410,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | `tru`, `nul`, etc. | `invalid literal` |
 | Unterminated JSON string | `unterminated string` |
 | Bad escape in JSON string | `invalid string escape` |
-| `json/stringify` called on a non-JSON value | `json/stringify does not support <type>` where `<type>` ∈ `nil`, `list`, `pair`, `function`, `macro`, `builtin`, `symbol`, `keyword`, `NaN`, `Infinity`, `-Infinity` |
+| `json/stringify` called on a non-JSON value | `json/stringify does not support <type>` where `<type>` ∈ `nil`, `list`, `pair`, `function`, `macro`, `builtin`, `symbol`, `keyword` |
 
 **let (stdlib)**
 
