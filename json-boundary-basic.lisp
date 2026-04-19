@@ -44,6 +44,12 @@
   (assert/equal (json/stringify -0.25) "-0.25")
   (assert/equal (print 1.5) "1.5"))
 
+(test "negative zero prints without sign"
+  (assert/equal (print -0.0) "0")
+  (assert/equal (print 0.0) "0")
+  (assert/equal (json/stringify -0.0) "0")
+  (assert/equal (json/stringify 0.0) "0"))
+
 (test "json boundary keeps nil distinct from null"
   (assert/equal (json/parse "null") null)
   (assert/throws (fn [] (json/stringify nil)) "json/stringify does not support nil"))

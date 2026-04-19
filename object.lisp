@@ -72,6 +72,17 @@
   (assert/throws (fn [] (quote {1 2})) "object keys must be keywords")
   (assert/throws (fn [] (quote {null 1})) "object keys must be keywords"))
 
+(test "quote validates keys recursively in nested object literals"
+  (assert/throws
+    (fn [] (quote {:a {"b" 1}}))
+    "object keys must be keywords")
+  (assert/throws
+    (fn [] (quote {:a [{"b" 1}]}))
+    "object keys must be keywords")
+  (assert/throws
+    (fn [] (quote {:a {:b {:c {"bad" 1}}}}))
+    "object keys must be keywords"))
+
 (test "quote preserves form values without evaluating"
   (assert/equal
     (print (quote {:a (+ 1 2)}))

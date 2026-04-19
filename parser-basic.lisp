@@ -55,6 +55,10 @@
   (assert/equal (print (parse "{:\"foo\" 1}")) "{:foo 1}")
   (assert/equal (print (parse "{:\"foo bar\" 2}")) "{:\"foo bar\" 2}"))
 
+(test "parse does not validate object keys — eval/quote does"
+  (assert/equal (print (parse "{\"a\" 1}")) "{\"a\" 1}")
+  (assert/equal (print (parse "{1 2}")) "{1 2}"))
+
 (test "print keyword with simple name uses unquoted form"
   (assert/equal (print :foo) ":foo")
   (assert/equal (print :cfg/port) ":cfg/port")

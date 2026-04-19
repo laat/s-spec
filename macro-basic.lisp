@@ -23,3 +23,13 @@
     (let [tmp 99]
       (with-tmp 1 tmp))
     1))
+
+(test "defmacro binds the name in the variable namespace too"
+  (defmacro m [x] (quasiquote (+ (unquote x) 1)))
+  (assert/equal (bound? 'm) true)
+  (assert/equal (bound? 'never-a-macro) false))
+
+(test "special forms always win over user macros with the same name"
+  (defmacro if [p t e] (quasiquote (+ (unquote p) 100)))
+  (assert/equal (if true 1 2) 1)
+  (assert/equal (if false 1 2) 2))

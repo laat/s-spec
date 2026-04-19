@@ -41,7 +41,7 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 | `or` | `(or forms...)` | Short-circuit. Returns first truthy or last value. `(or)` → `false`. |
 | `quote` | `(quote form)` | Return form unevaluated. |
 | `quasiquote` | `(quasiquote form)` | Template. `unquote` evaluates, `splice-unquote` splices. |
-| `defmacro` | `(defmacro name [params] body...)` | Define macro. Supports `& rest` and docstrings. |
+| `defmacro` | `(defmacro name [params] body...)` | Define macro. Supports `& rest` and docstrings. The name is bound in both the macro table (for call-site expansion) and the variable namespace (for `bound?`, `doc`, and symbol lookup); `(doc name)` returns the macro's docstring and `(bound? (quote name))` returns `true`. **Special-form names always win**: shadowing a special form (e.g. `(defmacro if [...] ...)`) installs the macro but the special form continues to dispatch — the macro is effectively unreachable by name. Hosts MUST dispatch special forms before consulting the macro table. |
 | `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. |
 | `require` | `(require "path")` | Like `load`, but cached by resolved absolute path — requiring the same file from different call sites or via different relative paths evaluates it only once. |
 
@@ -106,7 +106,9 @@ Examples:
 
 ### Validation Model
 
-The reader is a pure source-to-form converter. Its output is ordinary s-spec data (lists, arrays, objects, atoms) — there is no separate AST type. It handles:
+The reader is a pure source-to-form converter. Its output is ordinary s-spec data — lists, arrays, atoms — with **one exception**: because object keys are validated at eval/quote time (not at read time), the reader's result for `{…}` is an unvalidated *object-literal form* that may hold any shape of key. `(parse "{\"a\" 1}")` must succeed, even though eval and quote will later throw `"object keys must be keywords"`. Hosts may represent this as a distinct internal form or as an Object that permits any key — the externally observable requirement is only that `parse` succeeds on syntactically well-formed `{…}` regardless of key types, and that every eval and quote path turns it into a runtime Object with keyword-only keys. The printer prints object-literal forms the same as runtime Objects.
+
+The reader handles:
 - Tokenization (numbers, strings, symbols, keywords, booleans, `nil`, `null`). Whitespace separates tokens; comma (`,`) is whitespace.
 - Delimiter matching (`(` `)`, `[` `]`, `{` `}`)
 - Reader shorthand expansion (`'x` → `(quote x)`, etc.)
@@ -122,14 +124,14 @@ All semantic validation happens at eval time:
 - `[v1 v2 …]` evaluates to the same value as `(array v1 v2 …)` — so `(= [1 2] (array 1 2))` is `true`
 - `{:k1 v1 :k2 v2 …}` evaluates to the same value as `(object :k1 v1 :k2 v2 …)` — so `(= {:a 1} (object :a 1))` is `true`
 
-Because forms are data, quoted literals are just the data the reader produced: `(quote {:a 1})` is an object with key `:a` and value `1`, identical to the runtime object `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms — there is no separate "object literal" type.
+Quoted literals evaluate through the same construction path as their literal form: `(quote {:a 1})` runs the quote construction path (validate keys, take values unevaluated) and produces a runtime Object, identical to `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms (the quote path does not evaluate values).
 
 **Object literal key validation.** `{…}` is a form. Two construction paths produce a runtime Object from it, and **both validate that every key is a keyword**:
 
 - **Evaluation** — validate keys, evaluate each value, build the Object.
-- **Quote** — validate keys, take values unevaluated (each value may itself be any form, including a list), build the Object.
+- **Quote** — validate keys, take values unevaluated (each value may itself be any form, including a list), build the Object. Quote **recurses into nested object literals** — any object-literal form appearing as a value (including inside nested arrays) is itself validated and converted to a runtime Object. This means `(quote {:a {"b" 1}})` throws, and a runtime Object never contains a nested unvalidated object-literal form.
 
-Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps Object a single runtime type whose keys are always keywords — consistent with the rest of the language, where reader output is plain data and no form has a distinct "literal" representation.
+Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps runtime Object a single type whose keys are always keywords; only the short-lived object-literal form produced by `parse` ever holds non-keyword keys.
 
 `unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
 
@@ -214,7 +216,7 @@ These three forms are listed separately from the builtins because they require a
 |------|----------|
 | `bound?` | `(bound? 'sym)` — `sym` is evaluated and must be a symbol (otherwise throws `"bound? requires a symbol"`). Walks the caller's lexical env chain. Presence, not truthiness — a binding to `nil` or `false` still returns `true`. |
 | `macroexpand-1` | `(macroexpand-1 form)` — If `form` is a list whose head is a symbol bound to a macro in the caller's env, apply that macro once. Otherwise return `form` unchanged. |
-| `macroexpand` | `(macroexpand form)` — Repeatedly apply `macroexpand-1` at the head until the head is no longer a macro (fixpoint by identity). Does not descend into sub-forms. |
+| `macroexpand` | `(macroexpand form)` — Repeatedly apply `macroexpand-1` at the head until the head is no longer bound to a macro. Termination is decided by head inspection only (not by structural comparison of successive expansions), so a macro that rewrites to a form with the same head symbol halts as soon as that head ceases to name a macro. Does not descend into sub-forms. |
 
 ### Keyword-as-function
 
@@ -228,12 +230,15 @@ Keywords are callable: `(:name obj)` looks up `:name` in `obj`, with optional de
 - strings, booleans, `nil`, `null`, symbols, keywords — as written
 - arrays, objects, proper lists — as literal syntax
 
-**Number Printing.** Numbers are float64. For a finite value `v`:
+**Number Printing.** Numbers are float64. `print` on a finite number MUST produce exactly the string that ECMAScript's `Number.prototype.toString(10)` would (ECMA-262 §6.1.6.1.13 *Number::toString*). The same formatter is used by `json/stringify`. Hosts that already expose this rule (JavaScript, and most JSON libraries that implement ECMA-404's "shortest round-trip") can delegate directly; others must implement the algorithm.
 
-- if `v` is integral and `|v| < 1e21`, emit the integer form (no decimal point, no exponent) — so `(print 1.0)` is `"1"` and `(print 1e10)` is `"10000000000"`
-- otherwise, emit the shortest decimal that round-trips to the same float64. Scientific notation uses lowercase `e` with a signed exponent: `1e+21`, `1.5e-10`
+Informally, the rule produces:
 
-The threshold `1e21` matches the ECMAScript `Number.toString` rule, so s-spec number output is interchangeable with JavaScript / standard JSON. Above the threshold, integer form would require 22+ digits; scientific is always shorter. `json/stringify` uses exactly the same formatter.
+- integer form (no decimal point, no exponent) when `v` is integral and `|v| < 1e21` — so `(print 1.0)` is `"1"` and `(print 1e10)` is `"10000000000"`
+- otherwise, the shortest decimal that round-trips to the same float64, with lowercase `e` and a signed exponent for scientific notation: `1e+21`, `1.5e-10`
+- `"0"` for both `0` and `-0` (the ECMAScript rule; negative zero is printed without the sign)
+
+The 1e21 threshold is where integer form would require 22+ digits and scientific is always shorter. Any divergence from `Number.toString` is a bug in the implementation, not in the spec.
 
 
 Non-data values print as fixed list forms. The output is always legal source and never `=` to the original value (since a parsed list is never `=` to a function, macro, builtin, or improper pair):
@@ -243,7 +248,13 @@ Non-data values print as fixed list forms. The output is always legal source and
 | function       | `(fn)`                                             |
 | macro          | `(macro)`                                          |
 | builtin        | `(builtin NAME)` — `NAME` is the builtin's symbol  |
-| improper pair  | `(A . B)` — where `A` and `B` are recursive prints |
+| improper pair  | walk form (see below)                              |
+
+Improper pairs print in **walk form**: follow the `rest` chain, space-separating each `first`, and stop at the first non-pair tail. If that tail is `nil`, the output is a proper-list form (but this case can only arise if the chain was built by `cons`-ing onto `nil`, in which case equality with a real list still fails because a pair is not `=` to a list form). If the tail is any other value, emit ` . ` followed by its print form. Examples:
+
+- `(cons 1 2)` → `"(1 . 2)"`
+- `(cons 1 (cons 2 3))` → `"(1 2 . 3)"`
+- `(cons 1 (cons 2 (cons 3 :end)))` → `"(1 2 3 . :end)"`
 
 The improper-pair form relies on `.` being a legal one-character symbol, which it is under the name grammar (`.` is a name-char and not digit-first).
 
@@ -298,7 +309,7 @@ This table is the canonical vocabulary. Do not invent new phrasings for conditio
 | Extra tokens after the first form in `parse` | `unexpected trailing` |
 | `"…` never closed | `unterminated string` |
 | `\q` or other unknown escape | `invalid string escape` |
-| `01`, `1.`, `1.e2`, `1a`, `123abc`, `+1` | `invalid number` |
+| `01`, `1.`, `1.e2`, `1a`, `123abc` | `invalid number` |
 | Bare `:` or `{: 1}` (no keyword body) | `invalid keyword` |
 | Object literal with an odd number of forms (reader-level check) | `requires an even number of forms` |
 | Reader shorthand with nothing after it | `expected form after quote` / `expected form after quasiquote` / `expected form after unquote` / `expected form after splice-unquote` |
