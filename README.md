@@ -27,6 +27,15 @@ This section lists everything a host language must implement. The stdlib (`stdli
 
 Only `false` and `nil` are falsey. Everything else is truthy — including `null`, `0`, `""`, `[]`, `{}`, symbols, keywords, functions, and macros.
 
+### Namespace Model
+
+s-spec is a **Lisp-1**: functions, macros, and values share a single variable namespace. A symbol resolves the same way in operator position (head of a call) as in value position.
+
+- `(def x 1)` followed by `(defmacro x [y] ...)` replaces `x` — the later binding wins.
+- `(bound? (quote name))` is `true` for any binding — var, function, or macro.
+- `defmacroonce` no-ops if the name is already bound **by anything** (var or macro). This is the standard Lisp-1 interpretation of "already bound".
+- Special-form names (`if`, `def`, `fn`, `quote`, …) are not in the namespace at all; they dispatch before name lookup. See the `defmacro` row below.
+
 ### Special Forms
 
 These must be implemented in the host evaluator. Arguments are **not** evaluated before dispatch.
