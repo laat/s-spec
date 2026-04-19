@@ -35,3 +35,10 @@
 (test "fn requires a body"
   (assert/throws (fn [] (fn [x y])) "fn requires a body")
   (assert/throws (fn [] (fn [])) "fn requires a body"))
+
+(test "print of a function is re-parseable and not equal"
+  (def f (fn [x] x))
+  (assert/equal (= f (parse (print f))) false))
+
+(test "print of a builtin is re-parseable and not equal"
+  (assert/equal (= + (parse (print +))) false))

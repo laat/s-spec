@@ -24,3 +24,9 @@
   (require "stdlib.lisp")
   (let [transient 1] transient)
   (assert/equal (bound? 'transient) false))
+
+(test "bound? rejects non-symbol arguments"
+  (assert/throws (fn [] (bound? 42)) "requires a symbol")
+  (assert/throws (fn [] (bound? "x")) "requires a symbol")
+  (assert/throws (fn [] (bound? :x)) "requires a symbol")
+  (assert/throws (fn [] (bound? nil)) "requires a symbol"))

@@ -20,3 +20,15 @@
   (assert/throws (fn [] (parse "{:\"bad 1}")) "unterminated string")
   (assert/throws (fn [] (parse "{:\"bad\\q\" 1}")) "invalid string escape"))
 
+(test "parse rejects malformed numbers"
+  (assert/throws (fn [] (parse "01")) "invalid number")
+  (assert/throws (fn [] (parse "1.")) "invalid number")
+  (assert/throws (fn [] (parse "1.e2")) "invalid number")
+  (assert/throws (fn [] (parse "1a")) "invalid number")
+  (assert/throws (fn [] (parse "123abc")) "invalid number"))
+
+(test "parse rejects trailing tokens"
+  (assert/throws (fn [] (parse "1 2")) "unexpected trailing")
+  (assert/throws (fn [] (parse "(+ 1 2) 3")) "unexpected trailing")
+  (assert/throws (fn [] (parse "a b")) "unexpected trailing"))
+

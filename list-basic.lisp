@@ -32,3 +32,7 @@
   (assert/equal (list? (cons 1 2)) false)
   (assert/equal (first (cons 1 2)) 1)
   (assert/equal (rest (cons 1 2)) 2))
+
+(test "print of an improper pair is re-parseable and not equal"
+  (def p (cons 1 2))
+  (assert/equal (= p (parse (print p))) false))

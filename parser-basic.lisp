@@ -1,7 +1,17 @@
 (test "parse number literals"
   (assert/equal (print (parse "1")) "1")
+  (assert/equal (print (parse "0")) "0")
   (assert/equal (print (parse "-3")) "-3")
-  (assert/equal (print (parse "4.2")) "4.2"))
+  (assert/equal (print (parse "4.2")) "4.2")
+  (assert/equal (print (parse "1e2")) "100")
+  (assert/equal (print (parse "1E10")) "10000000000")
+  (assert/equal (print (parse "-1e2")) "-100"))
+
+(test "parse number-like tokens that are symbols"
+  (assert/equal (print (parse "+1")) "+1")
+  (assert/equal (print (parse "-")) "-")
+  (assert/equal (print (parse ".5")) ".5")
+  (assert/equal (print (parse "-x")) "-x"))
 
 (test "parse string literals"
   (assert/equal (print (parse "\"hello\"")) "\"hello\"")
@@ -144,6 +154,11 @@
 
 (test "parse ignores extra whitespace"
   (assert/equal (print (parse "   ( + 1   2 )   ")) "(+ 1 2)"))
+
+(test "parse treats commas as whitespace"
+  (assert/equal (print (parse "[1, 2, 3]")) "[1 2 3]")
+  (assert/equal (print (parse "{:a 1, :b 2}")) "{:a 1 :b 2}")
+  (assert/equal (print (parse "(+ 1, 2, 3)")) "(+ 1 2 3)"))
 
 (test "parse canonicalizes array whitespace"
   (assert/equal (print (parse " [ 1   2  3 ] ")) "[1 2 3]")

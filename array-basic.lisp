@@ -24,6 +24,12 @@
   (assert/equal (get [10 20 30] 3) nil)
   (assert/equal (get [10 20 30] 99) nil))
 
+(test "array get with non-integer index returns default"
+  (assert/equal (get [10 20 30] 0.5) nil)
+  (assert/equal (get [10 20 30] 1.9) nil)
+  (assert/equal (get [10 20 30] 0.5 :missing) :missing)
+  (assert/equal (get [10 20 30] -0.1 :missing) :missing))
+
 (test "nested arrays"
   (assert/equal (get [1 [2 3] 4] 1) [2 3])
   (assert/equal (get (get [1 [2 3] 4] 1) 0) 2))
