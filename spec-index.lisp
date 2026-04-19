@@ -13,6 +13,7 @@
     "rest-params-basic.lisp"
     "def-basic.lisp"
     "def-errors.lisp"
+    "bound-basic.lisp"
     "let-derived-form.lisp"
     "if-basic.lisp"
     "if-errors.lisp"

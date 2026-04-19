@@ -5,9 +5,11 @@
 (test "defmacro requires a body"
   (assert/throws (fn [] (defmacro m [x])) "defmacro requires a body"))
 
-(test "macro expansion requires list forms"
-  (assert/throws (fn [] (macroexpand-1 123)) "macroexpand-1 requires exactly one form")
-  (assert/throws (fn [] (macroexpand null)) "macroexpand requires exactly one form"))
+(test "macroexpand requires exactly one argument"
+  (assert/throws (fn [] (macroexpand-1)) "macroexpand-1 requires exactly one argument")
+  (assert/throws (fn [] (macroexpand-1 1 2)) "macroexpand-1 requires exactly one argument")
+  (assert/throws (fn [] (macroexpand)) "macroexpand requires exactly one argument")
+  (assert/throws (fn [] (macroexpand 1 2)) "macroexpand requires exactly one argument"))
 
 (test "defmacro requires a name, params, and body"
   (assert/throws (fn [] (defmacro)) "defmacro requires a name, params, and body")

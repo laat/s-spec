@@ -5,7 +5,11 @@
   (assert/equal (if 0 :then :else) :then)
   (assert/equal (if "" :then :else) :then)
   (assert/equal (if [] :then :else) :then)
-  (assert/equal (if {} :then :else) :then))
+  (assert/equal (if {} :then :else) :then)
+  (assert/equal (if :k :then :else) :then)
+  (assert/equal (if (quote x) :then :else) :then)
+  (assert/equal (if (fn [] 1) :then :else) :then)
+  (assert/equal (if + :then :else) :then))
 
 (test "function arguments evaluate left to right"
   (require "stdlib.lisp")

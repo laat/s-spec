@@ -42,6 +42,12 @@
   (assert/equal (= {:x {:a 1 :b 2}} {:x {:b 2 :a 1}}) true)
   (assert/equal (= {:a 1 :b 2} {:a 1 :b 3}) false))
 
+(test "callables compare by identity"
+  (def f1 (fn [x] x))
+  (assert/equal (= f1 f1) true)
+  (assert/equal (= (fn [x] x) (fn [x] x)) false)
+  (assert/equal (= + +) true))
+
 (test "not-equals operator"
   (assert/equal (/=) false)
   (assert/equal (/= 1) false)

@@ -25,7 +25,7 @@ This section lists everything a host language must implement. The stdlib (`stdli
 
 ### Truthiness
 
-Only `false` and `nil` are falsey. Everything else is truthy — including `null`, `0`, `""`, `[]`, `{}`.
+Only `false` and `nil` are falsey. Everything else is truthy — including `null`, `0`, `""`, `[]`, `{}`, symbols, keywords, functions, and macros.
 
 ### Special Forms
 
@@ -33,8 +33,8 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 
 | Form | Syntax | Description |
 |------|--------|-------------|
-| `fn` | `(fn [params] body...)` | Create a closure. Optional docstring as first body form. Supports `& rest`. |
-| `def` | `(def name expr)` | Bind in global env. Returns value. |
+| `fn` | `(fn [params] body...)` | Create a closure. A leading string is a docstring only when at least one more body form follows; otherwise it is itself a body form. Supports `& rest`. |
+| `def` | `(def name expr)` | Bind at the root of the current env chain (not the lexical scope). Returns value. |
 | `if` | `(if cond then else)` | Evaluate selected branch only. |
 | `do` | `(do forms...)` | Sequential eval, return last. `(do)` → `nil`. |
 | `and` | `(and forms...)` | Short-circuit. Returns first falsey or last value. `(and)` → `true`. |
@@ -43,7 +43,7 @@ These must be implemented in the host evaluator. Arguments are **not** evaluated
 | `quasiquote` | `(quasiquote form)` | Template. `unquote` evaluates, `splice-unquote` splices. |
 | `defmacro` | `(defmacro name [params] body...)` | Define macro. Supports `& rest` and docstrings. |
 | `load` | `(load "path")` | Read and eval file. Paths resolve relative to caller. |
-| `require` | `(require "path")` | Like load, but cached. |
+| `require` | `(require "path")` | Like `load`, but cached by resolved absolute path — requiring the same file from different call sites or via different relative paths evaluates it only once. |
 
 ### Reader Syntax (shorthands)
 
@@ -94,8 +94,8 @@ Functions bound in the global environment.
 | `list?` | `(list? v)` | True for nil and proper lists. |
 | `array?` | `(array? v)` | |
 | `symbol?` | `(symbol? v)` | |
-| `bound?` | `(bound? 'sym)` | True if symbol is defined in scope. |
-| `=` | `(= vals...)` | Deep equality. Objects ignore key order. `(=)` → `true`. |
+| `bound?` | `(bound? 'sym)` | True if `sym` is bound in the current lexical scope (walks the env chain). Presence check, not truthiness — a binding to `nil` or `false` still returns `true`. |
+| `=` | `(= vals...)` | Deep equality. Objects ignore key order. Functions, macros, and builtins compare by identity. `(=)` → `true`. |
 | `/=` | `(/= vals...)` | Logical inverse of `=`. `(/=)` → `false`. |
 | `print` | `(print v)` | Canonical string representation. |
 | `parse` | `(parse str)` | Read s-spec source string into a form. No semantic validation. |
@@ -104,8 +104,8 @@ Functions bound in the global environment.
 | `doc` | `(doc fn)` | Get docstring. |
 | `gensym` | `(gensym [prefix])` | Unique symbol. |
 | `error` | `(error msg)` | Throw an error. |
-| `macroexpand-1` | `(macroexpand-1 form)` | One macro expansion step. |
-| `macroexpand` | `(macroexpand form)` | Full macro expansion. |
+| `macroexpand-1` | `(macroexpand-1 form)` | If `form` is a list whose head is a symbol bound to a macro, apply that macro once. Otherwise return `form` unchanged. |
+| `macroexpand` | `(macroexpand form)` | Repeatedly apply `macroexpand-1` at the head until the head is no longer a macro. Does not descend into sub-forms. |
 
 ### Keyword-as-function
 
@@ -137,6 +137,5 @@ The spec is tested via `.lisp` files using these forms (implemented as special f
 - `(assert/throws (fn [] expr) "substring")` — error assertion
 
 Isolation rules:
-- Each `(test ...)` block runs in a fresh environment
-- `def` inside a test binds in the test's environment, not the root
+- Each test runs in a fresh root environment; `def` targets that root — even when called from a nested function or a loaded file — so bindings never leak across tests
 - `require` cache and `gensym` counter reset between tests

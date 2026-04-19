@@ -18,6 +18,12 @@
            "This is not a docstring"))
     nil))
 
+(test "single-string body is the return value, not a docstring"
+  (assert/equal ((fn [] "hello")) "hello")
+  (assert/equal (doc (fn [] "hello")) nil)
+  (assert/equal ((fn [x] "hi") 1) "hi")
+  (assert/equal (doc (fn [x] "hi")) nil))
+
 (test "doc works on function values only"
   (assert/throws (fn [] (doc 123)) "requires a function")
   (assert/throws (fn [] (doc null)) "requires a function")

@@ -29,3 +29,30 @@
   (assert/equal
     (print (macroexpand (quote (mark 1))))
     "[expanded 1]"))
+
+(test "macroexpand returns non-list forms unchanged"
+  (assert/equal (macroexpand-1 123) 123)
+  (assert/equal (macroexpand null) null)
+  (assert/equal (macroexpand-1 "hello") "hello")
+  (assert/equal (macroexpand :foo) :foo)
+  (assert/equal (macroexpand-1 true) true)
+  (assert/equal (macroexpand-1 false) false)
+  (assert/equal (macroexpand nil) nil)
+  (assert/equal
+    (print (macroexpand (quote x)))
+    "x")
+  (assert/equal
+    (print (macroexpand [1 2 3]))
+    "[1 2 3]")
+  (assert/equal
+    (print (macroexpand {:a 1}))
+    "{:a 1}"))
+
+(test "macroexpand on list with non-macro head returns unchanged"
+  (assert/equal
+    (print (macroexpand (quote (undefined-sym 1 2))))
+    "(undefined-sym 1 2)")
+  (def not-a-macro (fn [x] x))
+  (assert/equal
+    (print (macroexpand (quote (not-a-macro 1 2))))
+    "(not-a-macro 1 2)"))
