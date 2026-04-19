@@ -7,6 +7,7 @@
     "boolean-basic.lisp"
     "list-basic.lisp"
     "array-basic.lisp"
+    "string-length.lisp"
     "object.lisp"
     "function-basic.lisp"
     "function-docs.lisp"

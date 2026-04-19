@@ -6,7 +6,7 @@
   (assert/equal (doc list) "Build a proper list from items.")
   (assert/equal (doc array) "Build an array from items.")
   (assert/equal (doc object) "Build an object from alternating keyword keys and values.")
-  (assert/equal (doc length) "Length of an array, string, or list.")
+  (assert/equal (doc length) "Length of an array, string, list, or object.")
   (assert/equal (doc get) "Look up a key in an array or object.")
   (assert/equal (doc nil?) "True when the value is nil.")
   (assert/equal (doc null?) "True when the value is null.")

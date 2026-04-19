@@ -106,7 +106,7 @@ Examples:
 
 ### Validation Model
 
-The reader is a pure syntax-to-AST converter. It handles:
+The reader is a pure source-to-form converter. Its output is ordinary s-spec data (lists, arrays, objects, atoms) — there is no separate AST type. It handles:
 - Tokenization (numbers, strings, symbols, keywords, booleans, `nil`, `null`). Whitespace separates tokens; comma (`,`) is whitespace.
 - Delimiter matching (`(` `)`, `[` `]`, `{` `}`)
 - Reader shorthand expansion (`'x` → `(quote x)`, etc.)
@@ -122,18 +122,20 @@ All semantic validation happens at eval time:
 - `[v1 v2 …]` evaluates to the same value as `(array v1 v2 …)` — so `(= [1 2] (array 1 2))` is `true`
 - `{:k1 v1 :k2 v2 …}` evaluates to the same value as `(object :k1 v1 :k2 v2 …)` — so `(= {:a 1} (object :a 1))` is `true`
 
-Quoted literals are ordinary data, not a tagged AST: `(quote {:a 1})` is an object with key `:a` and value `1`, identical to the runtime object `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms — there is no separate "object literal" type.
+Because forms are data, quoted literals are just the data the reader produced: `(quote {:a 1})` is an object with key `:a` and value `1`, identical to the runtime object `{:a 1}`. Therefore `(= (quote {:a 1}) {:a 1})` is `true`, `(= (quote {:a 1}) (quote {:a 1}))` is `true`, and the parallel holds for arrays. Quoted object literals whose value positions contain forms (e.g. `(quote {:a (+ 1 2)})`) are objects whose values happen to be list forms — there is no separate "object literal" type.
 
 **Object literal key validation.** `{…}` is a form. Two construction paths produce a runtime Object from it, and **both validate that every key is a keyword**:
 
 - **Evaluation** — validate keys, evaluate each value, build the Object.
 - **Quote** — validate keys, take values unevaluated (each value may itself be any form, including a list), build the Object.
 
-Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps Object a single runtime type whose keys are always keywords, and removes the need for any hidden object-literal AST.
+Either path throws `"object keys must be keywords"` if any key is not a keyword. So `(fn [] {"a" 1})` throws when called, **and** `(quote {"a" 1})` also throws. The only difference between the two paths is whether values are evaluated. This keeps Object a single runtime type whose keys are always keywords — consistent with the rest of the language, where reader output is plain data and no form has a distinct "literal" representation.
 
 `unquote` and `splice-unquote` outside a `quasiquote` context throw "unquote/splice-unquote outside quasiquote" regardless of arity — context is checked before arity.
 
-Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`. Directly as the `quasiquote` argument with no enclosing container — `` `(splice-unquote xs) `` — there is nothing to splice into, so it throws `"splice-unquote requires a list or array"` (the same substring used when the spliced value is not a sequence).
+Inside `quasiquote`, `splice-unquote` splices into lists and arrays. In an object **value** position it is allowed and behaves like `unquote` — the evaluated sequence becomes the value (no spread is possible since only one value is expected). In object **key** position it throws `"splice-unquote is not valid in object key position"`. Directly as the `quasiquote` argument with no enclosing container — `` `(splice-unquote xs) `` — there is nothing to splice into, so it throws `"splice-unquote requires an enclosing list or array"`. When the container exists but the spliced value is not a sequence (e.g. `` `(a (splice-unquote 2) b) ``), it throws a distinct `"splice-unquote value must be a list or array"`. `nil` is the empty proper list, so splicing `nil` into a list or array contributes zero elements (no error).
+
+`unquote` **is** allowed in object key position: `` `{(unquote k) 1} `` evaluates `k` and uses its value as the key. The same key-type rule applies — the value `k` evaluates to must be a keyword, otherwise `"object keys must be keywords"` is thrown. Unlike the splice-unquote key-position rule (which is a structural constraint), this is just the ordinary key-type check applied to the computed key.
 
 All of the above — splicing, key-position rejection, no-container rejection — apply only at **depth 1** (the enclosing `quasiquote` currently being expanded). Each nested `quasiquote` increments depth; each `unquote` / `splice-unquote` decrements it. At depth > 1 the forms are preserved as literal data for the inner `quasiquote` to handle, and no validation fires. So `` ``{(splice-unquote x) 1} `` expands to the form `` `{(splice-unquote x) 1} `` without raising.
 
@@ -152,7 +154,7 @@ Functions bound in the global environment.
 | `list` | `(list items...)` | Build proper list. `(list)` → `nil`. |
 | `array` | `(array items...)` | Build array. |
 | `object` | `(object items...)` | Build object. Items alternate keyword keys and values. Throws `"object arity mismatch"` on odd count and `"object keys must be keywords"` on non-keyword keys. |
-| `length` | `(length v)` | Length of array, string, or list. |
+| `length` | `(length v)` | Length of array, string, list, or object. On strings, counts Unicode code points (so `(length "🎉")` is `1`, not `2` UTF-16 code units or `4` UTF-8 bytes). On objects, returns the number of keys. |
 | `get` | `(get coll key [default])` | Look up in an array (integer index) or object (keyword key). Returns the default (or `nil` if none given) when `coll` is `nil`, or when the key/index type doesn't match the collection, or when the index is out of bounds / key missing. Throws `"get requires an array or object"` for any other value — numbers, strings, booleans, improper pairs. |
 | `nil?` | `(nil? v)` | |
 | `null?` | `(null? v)` | |
@@ -183,7 +185,7 @@ Functions bound in the global environment.
 | `list` | `Build a proper list from items.` |
 | `array` | `Build an array from items.` |
 | `object` | `Build an object from alternating keyword keys and values.` |
-| `length` | `Length of an array, string, or list.` |
+| `length` | `Length of an array, string, list, or object.` |
 | `get` | `Look up a key in an array or object.` |
 | `nil?` | `True when the value is nil.` |
 | `null?` | `True when the value is null.` |
@@ -280,6 +282,123 @@ The standard library (`stdlib.lisp`) defines these from primitives. Host impleme
 | `or-else` | `(or-else a b)` — evaluate `a` once; return if truthy, else `b` |
 | `and-then` | `(and-then a b)` — evaluate `a` once; return `b` if truthy, else `a` |
 | `defn` | `(defn name [params] body...)` — define named function |
+
+### Error Vocabulary
+
+Every error s-spec raises is matched by substring in the spec tests (see `(assert/throws … "substring")`). Implementations MUST produce an error whose message contains the substring shown here for the listed condition. The exact full text is unspecified — host implementations can prepend paths, line numbers, or context — but the substring must be present literally.
+
+This table is the canonical vocabulary. Do not invent new phrasings for conditions already listed.
+
+**Reader / parser**
+
+| Condition | Substring |
+|---|---|
+| Unclosed `(`, `[`, `{`, string, or quote shorthand with no following form | `unexpected end of input` |
+| Stray `)`, `]`, or `}` | `unexpected closing delimiter` |
+| Extra tokens after the first form in `parse` | `unexpected trailing` |
+| `"…` never closed | `unterminated string` |
+| `\q` or other unknown escape | `invalid string escape` |
+| `01`, `1.`, `1.e2`, `1a`, `123abc`, `+1` | `invalid number` |
+| Bare `:` or `{: 1}` (no keyword body) | `invalid keyword` |
+| Object literal with an odd number of forms (reader-level check) | `requires an even number of forms` |
+| Reader shorthand with nothing after it | `expected form after quote` / `expected form after quasiquote` / `expected form after unquote` / `expected form after splice-unquote` |
+
+**Special-form arity and shape**
+
+| Condition | Substring |
+|---|---|
+| `(def)` / `(def x)` / `(def x 1 2)` | `def requires exactly two arguments` |
+| `(def "x" 1)` / `(def :x 1)` / `(def [x] 1)` | `def name must be a symbol` |
+| `(defonce)` / `(defonce x 1 2)` | `defonce requires exactly two arguments` |
+| `(defonce "x" 1)` etc. | `defonce name must be a symbol` |
+| `(if)` / `(if p t)` / `(if p t e extra)` | `if requires exactly three arguments` |
+| `(fn x body)` — params not a vector | `fn params must be a vector` |
+| `(fn [x y])` / `(fn [])` — no body | `fn requires a body` |
+| `(defmacro)` / `(defmacro m)` | `defmacro requires a name, params, and body` |
+| `(defmacro "m" [x] x)` | `defmacro name must be a symbol` |
+| `(defmacro m x x)` | `defmacro params must be a vector` |
+| `(defmacro m [x])` — no body | `defmacro requires a body` |
+| `(defmacroonce "m" …)` | `defmacroonce name must be a symbol` |
+| `(defmacroonce m x x)` | `defmacroonce params must be a vector` |
+| `(defmacroonce m [x])` | `defmacroonce requires a body` |
+| `(quote)` / `(quote a b)` | `quote requires exactly one argument` |
+| `(quasiquote)` / `(quasiquote a b)` | `quasiquote requires exactly one argument` |
+| `(unquote)` / `(unquote a b)` inside `quasiquote` | `unquote requires exactly one argument` |
+| `(splice-unquote)` / `(splice-unquote a b)` inside `quasiquote` | `splice-unquote requires exactly one argument` |
+| `unquote` / `splice-unquote` outside `quasiquote` (any arity) | `unquote outside quasiquote` / `splice-unquote outside quasiquote` |
+
+**Quasiquote expansion**
+
+| Condition | Substring |
+|---|---|
+| `splice-unquote` at top of `quasiquote` (no enclosing list/array) | `splice-unquote requires an enclosing list or array` |
+| `splice-unquote` whose value is not a list or array | `splice-unquote value must be a list or array` |
+| `splice-unquote` in object key position | `splice-unquote is not valid in object key position` |
+
+**Object construction**
+
+| Condition | Substring |
+|---|---|
+| Non-keyword key in `{…}`, `(object …)`, `(quote {…})`, or computed via `(unquote …)` | `object keys must be keywords` |
+| `(object …)` called with an odd number of arguments | `object arity mismatch` |
+| `(:key …)` applied to any non-object value | `requires an object` |
+
+**Callable / arity**
+
+| Condition | Substring |
+|---|---|
+| Too few or too many positional args to a user function | `arity mismatch` |
+| Head of a call form is not a function, macro, builtin, or keyword | `requires a function` |
+| `(get v …)` where `v` is not an array, object, or `nil` | `get requires an array or object` (tests match the shorter `get requires`) |
+
+**Resolution / binding**
+
+| Condition | Substring |
+|---|---|
+| Reference to an unbound symbol | `undefined symbol` |
+| `(bound? v)` where `v` is not a symbol | `requires a symbol` |
+| `(doc v)` where `v` is not a function, macro, or builtin | `doc requires a function, macro, or builtin` |
+
+**Utilities**
+
+| Condition | Substring |
+|---|---|
+| `(gensym p)` where `p` is not a string | `gensym prefix must be a string` |
+| `(gensym a b)` — too many args | `gensym requires zero or one argument` |
+| `(macroexpand-1)` / `(macroexpand-1 a b)` | `macroexpand-1 requires exactly one argument` |
+| `(macroexpand)` / `(macroexpand a b)` | `macroexpand requires exactly one argument` |
+
+**Modules**
+
+| Condition | Substring |
+|---|---|
+| `(load v)` / `(require v)` where `v` is not a string | `load requires a string path` / `require requires a string path` |
+| Target file does not exist | `file not found` |
+
+**JSON**
+
+| Condition | Substring |
+|---|---|
+| Unterminated array/object in `json/parse` | `unexpected end of input` |
+| Stray closing bracket in `json/parse` | `unexpected token` |
+| Trailing `,` before `]` or `}` | `trailing comma` |
+| Unquoted key in a JSON object | `object keys must be strings` |
+| Missing `:` between key and value | `expected ':'` |
+| Empty value slot (`{"a":}`, `[,1]`) | `expected value` |
+| Missing `,` between array elements | `expected ',' or ']'` |
+| `01`, `1.`, `+1`, etc. in JSON | `invalid number` |
+| `tru`, `nul`, etc. | `invalid literal` |
+| Unterminated JSON string | `unterminated string` |
+| Bad escape in JSON string | `invalid string escape` |
+| `json/stringify` called on a non-JSON value | `json/stringify does not support <type>` where `<type>` ∈ `nil`, `list`, `pair`, `function`, `macro`, `builtin`, `symbol`, `keyword`, `NaN`, `Infinity`, `-Infinity` |
+
+**let (stdlib)**
+
+| Condition | Substring |
+|---|---|
+| `(let x body)` — bindings not a vector | `let bindings must be a vector` |
+| `(let [x] body)` — odd bindings | `let requires an even number of binding forms` |
+| `(let ["x" 1] body)` / `(let [:x 1] body)` | `let binding name must be a symbol` |
 
 ### Test Harness
 

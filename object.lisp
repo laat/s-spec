@@ -76,3 +76,9 @@
   (assert/equal
     (print (quote {:a (+ 1 2)}))
     "{:a (+ 1 2)}"))
+
+(test "length on object returns number of keys"
+  (assert/equal (length {}) 0)
+  (assert/equal (length {:a 1}) 1)
+  (assert/equal (length {:a 1 :b 2 :c 3}) 3)
+  (assert/equal (length {:a 1 :a 2}) 1))
